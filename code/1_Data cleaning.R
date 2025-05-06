@@ -7,8 +7,10 @@
 getwd()
 list.files()
 
+library(tidyverse)
+library(dplyr)
 library(readr) 
-df <- read.csv("data/Food_Time_Data_Set.csv")
+df <- read.csv("../data/Food_Time_Data_Set.csv")
 
 dim(df)
 head(df)
@@ -39,7 +41,7 @@ df_clean <- df %>%
       weather_description_cleaned %in% c("mist", "moderate rain", "light rain") ~ "Rainy",
       TRUE ~ NA_character_
     ), levels = c("Clear", "Poor Visibility", "Rainy"), ordered = TRUE),
-    Long_Delivery= if_else(TARGET >= 40, 1, 0),
+    Long_Delivery_Flag= if_else(TARGET >= 40, 1, 0),
     speed = if_else(TARGET > 0, as.integer(Distance..km. *60/ TARGET), NA_real_)  
   ) %>%
   
@@ -58,4 +60,5 @@ dim(df_clean)
 
 # View the cleaned dataset
 head(df_clean)
-write.csv(df_clean, "data/cleaned_data.csv", row.names = FALSE)
+write.csv(df_clean, "../data/cleaned_data.csv", row.names = FALSE)
+
