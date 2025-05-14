@@ -21,9 +21,9 @@ df.food_time <- read.csv("../data/Food_Time_Data_Set.csv")
 
 # Investigating if loaded correctly
 
-dim(df)
-head(df)
-summary(df)
+dim(df.food_time)
+head(df.food_time)
+summary(df.food_time)
 
 # **************************** PART 2: Renaming column names to snake case (incl. more descriptive names)
 
@@ -50,18 +50,18 @@ df.food_time <- df.food_time %>%
 
 colnames(df.food_time)
 
-# **************************** PART 2: Cleaning the data
+# **************************** PART 3: Cleaning the data
 
 
 #This part will do the following:
-#- Clean numeric values and converc to numberic
-#- Clean and convert catergorial variables to facotrs
+#- Clean numeric values and convert to numeric
+#- Clean and convert categorical variables to factors
 #- Clean traffic level
-#- Clean weather descripion & create the three categories Clear / Poor Visibility / Rainy
+#- Clean weather description & create the three categories Clear / Poor Visibility / Rainy
 #- Insert a flag for long delivery time (if >= 40 min)
 #- Calculate the average speed in km/h
 #- Remove rows with NA values
-#- Filter out coordinates which are not in india
+#- Filter out coordinates which are not in India
 
 df_clean <- df.food_time %>%
   select(-X) %>%
@@ -116,3 +116,4 @@ write.csv(df_clean, "../data/cleaned_data.csv", row.names = FALSE)
 dim(df_clean)
 str(df_clean)
 head(df_clean)
+View(df_clean)
