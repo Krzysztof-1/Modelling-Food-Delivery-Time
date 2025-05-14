@@ -78,7 +78,7 @@ df_clean <- df.food_time %>%
     order_type_factor = factor(str_trim(order_type)),
     vehicle_type_factor = factor(str_trim(vehicle_type)),
     
-    # Clean traffic level (lowercase and trimmed)
+    # Clean traffic level (lowercase and trimmed) 
     traffic_level_cleaned = str_trim(tolower(traffic_level)),
     traffic_level_factor = factor(traffic_level_cleaned),
     
