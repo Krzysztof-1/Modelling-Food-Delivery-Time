@@ -17,7 +17,7 @@ list.files()
 
 # Loading data into csv
 
-df.food_time <- read.csv("data/Food_Time_Data_Set.csv")
+df.food_time <- read.csv("../data/Food_Time_Data_Set.csv")
 
 # Investigating if loaded correctly
 
@@ -52,23 +52,19 @@ colnames(df.food_time)
 
 # **************************** PART 2: Cleaning the data
 
-"""
-This part will do the following:
-- Clean numeric values and converc to numberic
-- Clean and convert catergorial variables to facotrs
-- Clean traffic level
-- Clean weather descripion & create the three categories Clear / Poor Visibility / Rainy
-- Insert a flag for long delivery time (if >= 40 min)
-- Calculate the average speed in km/h
-- Remove rows with NA values
-- Filter out coordinates which are not in india
 
-"""
-
+#This part will do the following:
+#- Clean numeric values and converc to numberic
+#- Clean and convert catergorial variables to facotrs
+#- Clean traffic level
+#- Clean weather descripion & create the three categories Clear / Poor Visibility / Rainy
+#- Insert a flag for long delivery time (if >= 40 min)
+#- Calculate the average speed in km/h
+#- Remove rows with NA values
+#- Filter out coordinates which are not in india
 
 df_clean <- df.food_time %>%
-  select(-X) %>%  # remove former index column (X)
-  
+  select(-X) %>%
   mutate(
     # Clean numeric values and convert to numeric
     distance_km = as.numeric(na_if(gsub("[^0-9\\.]", "", distance_km), "")),  
@@ -95,17 +91,16 @@ df_clean <- df.food_time %>%
     long_delivery_flag = if_else(delivery_time_min >= 40, 1, 0),
     
     # Calculate average speed (km/h)
-    average_speed_kmph = if_else(delivery_time_min > 0, distance_km * 60 / delivery_time_min, NA_real_)
+    average_speed_kmph = as.integer(if_else(delivery_time_min > 0, distance_km * 60 / delivery_time_min, NA_real_))
   ) %>%
-  
-  # Remove rows with missing values
   drop_na() %>%
-  
-  # Filter out invalid coordinates (approximate valid range for India)
   filter(
     customer_longitude_deg >= 60, restaurant_longitude_deg >= 60,
     customer_latitude_deg >= 0, restaurant_latitude_deg >= 0
   )
+
+# Check structure after cleaning
+str(df_clean)
 
 
 # Check for missing values in cleaned data & str
@@ -116,7 +111,7 @@ dim(df_clean)
 # View the cleaned dataset
 getwd()
 head(df_clean)
-write.csv(df_clean, "data/cleaned_data.csv", row.names = FALSE)
+write.csv(df_clean, "../data/cleaned_data.csv", row.names = FALSE)
 
 dim(df_clean)
 str(df_clean)
