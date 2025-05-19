@@ -1,0 +1,258 @@
+---
+title: "A Data-Driven Approach to Predicting Food Delivery Time: A Multi-Model Machine Learning Framework"
+author: "Krzysztof Baran, Curdin Caderas, Wenxing Xu"
+date: "2025-05-07"
+bibliography: references.bib
+csl: apa.csl
+output: 
+  html_document:
+    df_print: paged
+knitr: 
+  opts_chunk:
+    warning:false
+    message:false
+---
+
+# 1. Introduction
+
+Brief introduction to the project, objectives, and relevance.
+
+# 2. Data Description
+
+## 2.1 Data Source
+
+1- What is about 
+
+2- Where is it from 
+
+3- What columns are in there 
+
+4- Data Preprocessing 
+
+## 2.2 Exploratory data analysis and data cleaning
+
+### 2.2.1 Geographic Filtering
+To gain an initial understanding of the dataset, we begin by examining the geographical distribution of the delivery observations. Four columns provide relevant location information:
+
+`restaurant_longitude_deg`, `Restaurant_longitude`, `Delivery_location_latitude`, `Delivery_location_longitude`. All delivery distances are under 50 km.
+
+Figures 1 and 2 show histograms of the restaurant latitude and longitude. The values span a broad range: latitudes from -30 to 30 and longitudes from -80 to 80. However, the distribution is uneven, with most data points concentrated at latitudes greater than 0 and longitudes greater than 60.
+
+To narrow the dataset to the relevant geographic area, we applied a filter to retain only observations with latitude ≥ 0 and longitude ≥ 60. This refinement reduced the dataset from 10,001 to 9,084 entries, all located within a single country—India.
+
+To visualize the geographic distribution of these observations, we first defined the map boundaries using the dataset’s minimum and maximum latitude and longitude values. These coordinates were converted into a simple feature object representing the corners of the bounding box. This object was then used to download map tiles corresponding to the area of interest, enabling accurate spatial visualization (Figure 3).
+
+Figure 4 displays all restaurant and delivery locations overlaid on the background map from Figure 3. The plotted points indicate that the observations were collected from 22 cities across India, including major urban centers such as New Delhi, Mumbai, Bangalore, Kolkata, and Chennai.
+
+
+```{r, warning=FALSE, message=FALSE}
+
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+library(ggspatial)
+library(terra)
+library(sf)
+library(maptiles)
+
+# Load the raw data
+df.food_time <- read.csv("../data/Food_Time_Data_Set.csv")
+
+# Histogram for Restaurant Latitude
+hist(df.food_time$restaurant_latitude_deg,
+     main = "Figure 1: Distribution of Restaurant Latitudes",
+     xlab = "Restaurant Latitude",
+     ylab = "Frequency",
+     col = "lightblue",
+     border = "black")
+
+# Histogram for Restaurant Longitude
+hist(df.food_time$restaurant_longitude_deg,
+     main = "Figure 2: Distribution of Restaurant Longitudes",
+     xlab = "Restaurant Longitude",
+     ylab = "Frequency",
+     col = "lightgreen",
+     border = "black")
+
+# Clean the data by filtering for geographic coordinates
+df.food_time.clean <- df.food_time %>%
+  filter(
+    customer_longitude_deg >= 60,
+    restaurant_longitude_deg >= 60,
+    customer_latitude_deg >= 0,
+    restaurant_latitude_deg >= 0
+  )
+
+# Create bounding box using the cleaned data
+bbox.sf <- st_as_sf(
+  data.frame(
+    Latitude = c(min(df.food_time.clean$restaurant_latitude_deg), 
+                 max(df.food_time.clean$restaurant_latitude_deg)),
+    Longitude = c(min(df.food_time.clean$restaurant_longitude_deg), 
+                  max(df.food_time.clean$restaurant_longitude_deg))
+  ),
+  coords = c("Longitude", "Latitude"),
+  crs = "+proj=longlat"
+)
+
+# Download map tiles
+example.map <- get_tiles(bbox.sf, provider = "OpenStreetMap")
+
+# Extract bounding box limits
+bbox.limits <- st_bbox(bbox.sf)
+
+
+# Figure 3: Plot the background map
+ggplot() +
+  layer_spatial(data = example.map) +
+  coord_sf(xlim = bbox.limits[c(1, 3)], ylim = bbox.limits[c(2, 4)]) +
+  labs(title = "Figure 3: Background Map with Tiles", x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+# Figure 4: Plot restaurant and delivery locations on the map
+ggplot() +
+  layer_spatial(data = example.map) +
+  geom_point(data = df.food_time.clean,
+             aes(x = restaurant_longitude_deg, y = restaurant_latitude_deg),
+             color = "blue", size = 2, alpha = 0.7, shape = 16) +
+  geom_point(data = df.food_time.clean,
+             aes(x = customer_longitude_deg, y = customer_latitude_deg),
+             color = "red", size = 2, alpha = 0.7, shape = 16) +
+  coord_sf(xlim = bbox.limits[c(1, 3)], ylim = bbox.limits[c(2, 4)]) +
+  labs(title = "Figure 4: Restaurant and Delivery Locations",
+       x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+### 2.2.2 Data Cleaning and Feature Engineering
+
+To prepare the dataset for analysis, several cleaning and transformation steps were performed:
+
+- Conversion of Numerical Values:
+The `distance_km` and `delivery_time_min columns`, originally stored as character strings with potential non-numeric characters, were cleaned using regular expressions and converted to numeric format.
+
+- Categorical Variable Cleaning:
+The order_type and vehicle_type columns were stripped of leading/trailing whitespace and converted to factors to facilitate modeling and analysis.
+
+- Traffic Level Standardization:
+The traffic_level column was converted to lowercase and trimmed to remove inconsistencies, then stored as a factor variable `traffic_level_factor`.
+
+- Weather Description Recategorization:
+The original weather_description field was cleaned and mapped into three broader weather categories:
+
+  - `Clear`: includes terms like "clear sky" or "few clouds"
+
+  - `Poor Visibility`: includes terms such as "fog" and "haze"
+
+  - `Rainy`: includes various rain-related descriptors
+These were stored as an ordered factor in a new variable weather_category.
+
+- Long Delivery Flag:
+A binary variable `long_delivery_flag` was created to indicate whether a delivery took 40 minutes or longer. This variable serves as the target for the binomial model. 
+
+- Average Speed Calculation:
+Delivery speed was computed in kilometers per hour `average_speed_kmph` by dividing distance by delivery time, and then converted to an integer. This variable serves as the target for the Poisson model. 
+
+- Missing Data Removal:
+All rows containing missing values after the above transformations were dropped to ensure data quality.
+
+The result is a cleaned and enriched dataset containing 9,035 observations, ready for exploratory data analysis and predictive modeling.
+
+
+```{r, warning=FALSE, message=FALSE}
+#This part will do the following:
+#- Clean numeric values and convert to numeric
+#- Clean and convert categorical variables to factors
+#- Clean traffic level
+#- Clean weather description & create the three categories Clear / Poor Visibility / Rainy
+#- Insert a flag for long delivery time (if >= 40 min)
+#- Calculate the average speed in km/h
+#- Remove rows with NA values
+#- Filter out coordinates which are not in India
+library(dplyr)
+library(tidyr)
+library(stringr)
+
+df_clean <- df.food_time.clean %>%
+  select(-X) %>%
+  mutate(
+    # Clean numeric values and convert to numeric
+    distance_km = as.numeric(na_if(gsub("[^0-9\\.]", "", distance_km), "")),  
+    delivery_time_min = as.numeric(na_if(gsub("[^0-9\\.]", "", delivery_time_min), "")),
+
+    # Clean and convert categorical variables to factors
+    order_type_factor = factor(str_trim(order_type)),
+    vehicle_type_factor = factor(str_trim(vehicle_type)),
+
+    # Clean traffic level
+    traffic_level_cleaned = str_trim(tolower(traffic_level)),
+    traffic_level_factor = factor(traffic_level_cleaned),
+
+    # Clean weather description
+    weather_description_cleaned = str_trim(tolower(weather_description)),
+    weather_category = factor(case_when(
+      weather_description_cleaned %in% c("broken clouds", "clear sky", "few clouds", "overcast clouds", "scattered clouds") ~ "Clear",
+      weather_description_cleaned %in% c("fog", "haze", "smoke") ~ "Poor Visibility",
+      weather_description_cleaned %in% c("mist", "moderate rain", "light rain") ~ "Rainy",
+      TRUE ~ NA_character_
+    ), levels = c("Clear", "Poor Visibility", "Rainy"), ordered = TRUE),
+
+    # Flag for long delivery time
+    long_delivery_flag = if_else(delivery_time_min >= 40, 1, 0),
+
+    # Calculate average speed in km/h
+    average_speed_kmph = as.integer(if_else(delivery_time_min > 0, distance_km * 60 / delivery_time_min, NA_real_))
+  ) %>%
+  drop_na()
+
+
+# Now check structure
+str(df_clean)
+
+# Check structure after cleaning
+str(df_clean)
+
+
+# Check for missing values in cleaned data & str
+colSums(is.na(df_clean))
+str(df_clean)
+dim(df_clean)
+```
+
+
+# 3. Modelling 
+
+## 3.1 Linear Model
+
+## 3.2 Generalized Linear Models
+
+### 3.2.1 Poisson Regression
+
+### 3.2.2 Binomial Regression
+
+## 3.3 Generalized Additive Models
+
+## 3.6 Support Vector Machine
+
+## 3.5 Neural Network
+
+
+# 4. Results and Discussion
+
+Presentation of model performances and comparison.
+
+# 5. Conclusion
+
+Interpretation of findings and implications.
+
+# 6 Chapter on AI 
+
+1- How did we use it? 
+
+2- Where did we have to be careful etc. 
+
+# References
