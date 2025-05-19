@@ -31,6 +31,45 @@ Brief introduction to the project, objectives, and relevance.
 
 ## 2.2 Exploratory data analysis and data cleaning
 
+Before starting any exploratory data analysis, we decided to modify the column names in the raw data to enhance the readability of the entire report.
+
+```{r, warning=FALSE, message=FALSE}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+library(ggspatial)
+library(terra)
+library(sf)
+library(maptiles)
+
+# Load the raw data
+df.food_time <- read.csv("../data/Food_Time_Data_Set.csv")
+
+# Renaming column names to snake case (incl. more descriptive names)
+
+df.food_time <- df.food_time %>%
+  rename(
+    order_id = ID,
+    courier_id = Delivery_person_ID,
+    courier_age_years = Delivery_person_Age,
+    courier_rating_1_to_5 = Delivery_person_Ratings,
+    restaurant_latitude_deg = Restaurant_latitude,
+    restaurant_longitude_deg = Restaurant_longitude,
+    customer_latitude_deg = Delivery_location_latitude,
+    customer_longitude_deg = Delivery_location_longitude,
+    order_type = Type_of_order,
+    vehicle_type = Type_of_vehicle,
+    temperature_celsius = temperature,
+    humidity_percent = humidity,
+    precipitation_mm = precipitation,
+    weather_description = weather_description,
+    traffic_level = Traffic_Level,
+    distance_km = Distance..km.,
+    delivery_time_min = TARGET
+  )
+```
+
+
 ### 2.2.1 Geographic Filtering
 To gain an initial understanding of the dataset, we begin by examining the geographical distribution of the delivery observations. Four columns provide relevant location information:
 
@@ -46,17 +85,6 @@ Figure 4 displays all restaurant and delivery locations overlaid on the backgrou
 
 
 ```{r, warning=FALSE, message=FALSE}
-
-# Load required libraries
-library(dplyr)
-library(ggplot2)
-library(ggspatial)
-library(terra)
-library(sf)
-library(maptiles)
-
-# Load the raw data
-df.food_time <- read.csv("../data/Food_Time_Data_Set.csv")
 
 # Histogram for Restaurant Latitude
 hist(df.food_time$restaurant_latitude_deg,
@@ -221,7 +249,13 @@ str(df_clean)
 colSums(is.na(df_clean))
 str(df_clean)
 dim(df_clean)
+
+# View the cleaned dataset
+head(df_clean)
+write.csv(df_clean, "../data/cleaned_data.csv", row.names = FALSE)
 ```
+
+### 2.2.3 Exploratory data analysis
 
 
 # 3. Modelling 
