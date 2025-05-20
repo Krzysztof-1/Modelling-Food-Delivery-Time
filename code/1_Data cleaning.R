@@ -45,8 +45,8 @@ df.food_time <- df.food_time %>%
     distance_km = Distance..km.,
     delivery_time_min = TARGET
   )
-# **************************** PART 3: Cleaning the data
 
+# **************************** PART 3: Cleaning the data
 
 #This part will do the following:
 #- Clean numeric values and convert to numeric

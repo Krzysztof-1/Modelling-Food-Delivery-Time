@@ -177,6 +177,7 @@ The original weather_description field was cleaned and mapped into three broader
   - `Poor Visibility`: includes terms such as "fog" and "haze"
 
   - `Rainy`: includes various rain-related descriptors
+
 These were stored as an ordered factor in a new variable weather_category.
 
 - Long Delivery Flag:
@@ -258,6 +259,7 @@ write.csv(df_clean, "../data/cleaned_data.csv", row.names = FALSE)
 ### 2.2.3 Exploratory data analysis
 
 
+
 # 3. Modelling 
 
 ## 3.1 Linear Model
@@ -270,7 +272,7 @@ write.csv(df_clean, "../data/cleaned_data.csv", row.names = FALSE)
 
 ## 3.3 Generalized Additive Models
 
-## 3.6 Support Vector Machine
+## 3.4 Support Vector Machine
 
 ## 3.5 Neural Network
 
