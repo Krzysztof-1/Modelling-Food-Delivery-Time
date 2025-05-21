@@ -107,7 +107,7 @@ ggplot(d.food_time, aes(x = distance_km, y = delivery_time_min, color = order_ty
   ) +
   theme_minimal()
 
-"""¨
+"""B(
 In the first plot we can see, that traffic_level_factor is most likely linearly separable.
 However the other two plots show a big overlap which is a hint that it could be difficult with a linear kernel.
 """
@@ -190,7 +190,7 @@ yrange <- seq(min(svm_data$average_speed_kmph), max(svm_data$average_speed_kmph)
 grid <- expand.grid(distance_km = xrange, average_speed_kmph = yrange)
 
 
-# apply svm modelto points in grid
+# apply svm model to points in grid
 grid$predicted <- predict(svm_model, newdata = grid)
 
 # apply colors (with rectangles) for decision of model and include points
@@ -279,7 +279,7 @@ confusionMatrix(pred_tuned, test_svm$traffic_level_factor)
 Conclusion: no improvement with model tuning. 
 Initial model was just as good.
 
-Ergänzen: Kommentar über Rechenpower
+ErgC$nzen: Kommentar C<ber Rechenpower
 
 """
 

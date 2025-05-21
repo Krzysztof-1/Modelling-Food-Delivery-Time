@@ -6,10 +6,14 @@ Start: 10.05.2025
 """
 
 # Libraries
-
+install.packages("GGally")
 library(ggplot2)
 library(dplyr)
 library(caret)
+library(patchwork)
+library(GGally)
+library(broom)
+library(knitr)
 
 """
 PLACEHOLDER
@@ -19,7 +23,7 @@ PLACEHOLDER
 
 # Loading cleaned data
 
-d.food_time <- read.csv("C:/Users/Setup/OneDrive/02_Masterstudium/03_Module/02_Semester_2/03_ML1/git_group_work/Modelling-Food-Delivery-Time/data/cleaned_data.csv", header = TRUE)
+d.food_time <- read.csv("../data/cleaned_data.csv", header = TRUE)
 
 # Checking data (structure / head / summary / NA)
 
@@ -163,6 +167,11 @@ We will investigate the following categorical variables:
 
 
 """
+# Releveling factor traffic_level & set to meaningful sequence (increasing)
+d.food_time$traffic_level_factor <- factor(
+  d.food_time$traffic_level_factor,
+  levels = c("very low", "low", "moderate", "high", "very high")
+)
 
 par(mfrow = c(2, 2), mar = c(5, 5, 4, 2))  
 
@@ -192,6 +201,21 @@ boxplot(log_delivery_time ~ weather_category, data = d.food_time,
 
 # Checking relation between distance_km and vehicle_type_factor in a boxplot
 boxplot(distance_km ~ vehicle_type_factor, data = d.food_time)
+
+selected_cols <- c("courier_age_years",
+                   "courier_rating_1_to_5",
+                   "temperature_celsius",
+                   "humidity_percent",
+                   "precipitation_mm",
+                   "distance_km",
+                   "delivery_time_min",
+                   "long_delivery_flag",
+                   "average_speed_kmph",
+                   "log_delivery_time"
+                   )
+
+pairs(d.food_time[, selected_cols])
+
 
 """
 From looking at the boxplots we can clearly see that traffic level seems to play an 
