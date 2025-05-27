@@ -22,7 +22,7 @@ Brief introduction to the project, objectives, and relevance.
 
 ## 2.1 Data Source
 
-1- What is about 
+1- What is it about 
 
 2- Where is it from 
 
@@ -30,11 +30,11 @@ Brief introduction to the project, objectives, and relevance.
 
 4- Data Preprocessing 
 
-## 2.2 Exploratory data analysis and data cleaning
+## 2.2 Data Cleaning and Exploratory Data Analysis
 
 Before starting any exploratory data analysis, we decided to modify the column names in the raw data to enhance the readability of the entire report.
 
-```{r, warning=FALSE, message=FALSE}
+```{r load_libraries, warning=FALSE, message=FALSE}
 # Load required libraries
 library(dplyr)
 library(ggplot2)
@@ -49,6 +49,8 @@ library(caret)
 library(broom)
 library(knitr)
 library(e1071)
+library(tidyr)
+library(stringr)
 
 
 # Load the raw data
@@ -80,27 +82,27 @@ df.food_time <- df.food_time %>%
 
 
 ### 2.2.1 Geographic Filtering
-To gain an initial understanding of the dataset, we begin by examining the geographical distribution of the delivery observations. Four columns provide relevant location information:
+To gain an initial understanding of the data set, we begin by examining the geographical distribution of the delivery observations. Four columns provide relevant location information:
 
 `restaurant_longitude_deg`, `Restaurant_longitude`, `Delivery_location_latitude`, `Delivery_location_longitude`. All delivery distances are under 50 km.
 
-Figures 1 and 2 show histograms of the restaurant latitude and longitude. The values span a broad range: latitudes from -30 to 30 and longitudes from -80 to 80. However, the distribution is uneven, with most data points concentrated at latitudes greater than 0 and longitudes greater than 60.
+Figures 1 and 2 show histograms of the restaurants' latitude and longitude. The values span a broad range: latitudes from -30 to 30 and longitudes from -80 to 80. However, the distribution is uneven, with most data points concentrated at latitudes greater than 0 and longitudes greater than 60.
 
-To narrow the dataset to the relevant geographic area, we applied a filter to retain only observations with latitude ≥ 0 and longitude ≥ 60. This refinement reduced the dataset from 10,001 to 9,084 entries, all located within a single country—India.
+To narrow the data set to the relevant geographic area, we applied a filter to retain only observations with latitude ≥ 0 and longitude ≥ 60. This refinement reduced the data set from 10,001 to 9,084 entries, all located within a single country—India.
 
-To visualize the geographic distribution of these observations, we first defined the map boundaries using the dataset’s minimum and maximum latitude and longitude values. These coordinates were converted into a simple feature object representing the corners of the bounding box. This object was then used to download map tiles corresponding to the area of interest, enabling accurate spatial visualization (Figure 3).
+To visualize the geographic distribution of these observations, we first defined the map boundaries using the data set’s minimum and maximum latitude and longitude values. These coordinates were converted into a simple feature object representing the corners of the bounding box. This object was then used to download map tiles corresponding to the area of interest, enabling accurate spatial visualization (Figure 3).
 
 Figure 4 displays all restaurant and delivery locations overlaid on the background map from Figure 3. The plotted points indicate that the observations were collected from 22 cities across India, including major urban centers such as New Delhi, Mumbai, Bangalore, Kolkata, and Chennai.
 
 
-```{r, warning=FALSE, message=FALSE, exec = FALSE}
+```{r geographic_filtering, warning=FALSE, message=FALSE, exec = FALSE}
 
 # Histogram for Restaurant Latitude
 hist(df.food_time$restaurant_latitude_deg,
      main = "Figure 1: Distribution of Restaurant Latitudes",
      xlab = "Restaurant Latitude",
      ylab = "Frequency",
-     col = "lightblue",
+     col = "steelblue",
      border = "black")
 
 # Histogram for Restaurant Longitude
@@ -108,7 +110,7 @@ hist(df.food_time$restaurant_longitude_deg,
      main = "Figure 2: Distribution of Restaurant Longitudes",
      xlab = "Restaurant Longitude",
      ylab = "Frequency",
-     col = "lightgreen",
+     col = "steelblue",
      border = "black")
 
 # Clean the data by filtering for geographic coordinates
@@ -167,41 +169,41 @@ ggplot() +
 
 ### 2.2.2 Data Cleaning and Feature Engineering
 
-To prepare the dataset for analysis, several cleaning and transformation steps were performed:
+To prepare the data set for analysis, several cleaning and transformation steps were performed:
 
 - Conversion of Numerical Values:
-The `distance_km` and `delivery_time_min columns`, originally stored as character strings with potential non-numeric characters, were cleaned using regular expressions and converted to numeric format.
+The `distance_km` and `delivery_time_min` columns, originally stored as character strings with potential non-numeric characters, were cleaned using regular expressions and converted to numeric format.
 
 - Categorical Variable Cleaning:
-The order_type and vehicle_type columns were stripped of leading/trailing whitespace and converted to factors to facilitate modeling and analysis.
+The `order_type` and `vehicle_type` columns were stripped of leading/trailing whitespaces and converted to factors to facilitate modeling and analysis.
 
 - Traffic Level Standardization:
-The traffic_level column was converted to lowercase and trimmed to remove inconsistencies, then stored as a factor variable `traffic_level_factor`.
+The `traffic_level` column was converted to lowercase and trimmed to remove inconsistencies, then stored as a factor variable `traffic_level_factor`.
 
-- Weather Description Recategorization:
-The original weather_description field was cleaned and mapped into three broader weather categories:
+- Weather Description Grouping:
+The original `weather_description` field was cleaned and mapped into three broader weather categories:
 
   - `Clear`: includes terms like "clear sky" or "few clouds"
 
   - `Poor Visibility`: includes terms such as "fog" and "haze"
 
-  - `Rainy`: includes various rain-related descriptors
+  - `Rainy`: includes various rain-related terms
 
-These were stored as an ordered factor in a new variable weather_category.
+These were stored as an ordered factor in a new variable:  `weather_category`.
 
 - Long Delivery Flag:
 A binary variable `long_delivery_flag` was created to indicate whether a delivery took 40 minutes or longer. This variable serves as the target for the binomial model. 
 
 - Average Speed Calculation:
-Delivery speed was computed in kilometers per hour `average_speed_kmph` by dividing distance by delivery time, and then converted to an integer. This variable serves as the target for the Poisson model. 
+Delivery speed `average_speed_kmph` was computed in kilometers per hour by dividing distance by delivery time, and then converting to an integer. This variable serves as the target for the Poisson model. 
 
 - Missing Data Removal:
 All rows containing missing values after the above transformations were dropped to ensure data quality.
 
-The result is a cleaned and enriched dataset containing 9,035 observations, ready for exploratory data analysis and predictive modeling.
+The result is a cleaned and enriched data set containing 9,035 observations, ready for exploratory data analysis and predictive modeling.
 
 
-```{r, warning=FALSE, message=FALSE}
+```{r data_cleaning, warning=FALSE, message=FALSE}
 #This part will do the following:
 #- Clean numeric values and convert to numeric
 #- Clean and convert categorical variables to factors
@@ -211,9 +213,6 @@ The result is a cleaned and enriched dataset containing 9,035 observations, read
 #- Calculate the average speed in km/h
 #- Remove rows with NA values
 #- Filter out coordinates which are not in India
-library(dplyr)
-library(tidyr)
-library(stringr)
 
 df_clean <- df.food_time.clean %>%
   select(-X) %>%
@@ -265,12 +264,12 @@ head(df_clean)
 write.csv(df_clean, "../data/cleaned_data.csv", row.names = FALSE)
 ```
 
-### 2.2.3 Exploratory data analysis
+### 2.2.3 Exploratory Data Analysis
 
-To start the EDA we will look at the distribution of our (main) target variable: Delivery Time [min].
-In order to do this we create a histogram and a boxplot. Furthermore we look at summary() of this column. 
+To start the EDA we will look at the distribution of our (main) target variable: `delivery_time_min`.
+In order to do this we create a histogram and a boxplot. Furthermore, we look at the summary of this column. 
 
-```{r, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
+```{r delivery_time_eda, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
 # Create histogram of target variable "Delivery Time [min]"
 p1 <- ggplot(df_clean, aes(x = delivery_time_min)) +
   geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
@@ -285,23 +284,23 @@ p2 <- ggplot(df_clean, aes(y = delivery_time_min)) +
 
 # Display next to each other
 p1 + p2
-```
-```{r}
+
+# Summary
 summary(df_clean$delivery_time_min)
 ```
 
-What we can see from looking at the above plots of our target variable is that the distribution seems right skewed. This can be seen on the histogram itself (flattening more slowly to the right) as well as in the boxplot (many outliers above the upper whisker).
+What we can see from looking at the above plots of our target variable is that the distribution seems right-skewed. This can be seen on the histogram itself (flattening more slowly to the right) as well as in the boxplot (many outliers above the upper whisker).
 
-Furthermore this can be seen by looking at summary():
+Furthermore, this can be seen by looking at the summary:
 
 - Mean > Median
-- Max value is ~ four times the size of median.
+- Max value is approx. four times the size of median.
 
-In addition to our observations, we know that time is considered an "Amount". From the lecture we learned, that it is advisable to log transform amounts.
+In addition to our observations, we know that time is considered an "amount". During lectures we learned that it is advisable to log-transform amounts.
 
-Following above mentioned points, in a next step we log-transform our target variable and include it into the dataframe (df_cleaned). To verify the log-transformation we will create the same plots and output as for the original target variable.
+Following the aforementioned points, in the next step we log-transform our target variable into `log_delivery_time` and include it in the dataframe `df_cleaned`. To verify the log-transformation we will create the same plots and output as for the original target variable.
 
-```{r, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
+```{r log_delivery_time_eda, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
 # Add log transformed delivery time to df_clean
 df_clean$log_delivery_time <- log(df_clean$delivery_time_min)
 
@@ -319,19 +318,19 @@ p4 <- ggplot(df_clean, aes(y = log_delivery_time)) +
 
 # Display next to each other
 p3 + p4
-```
-```{r}
+
+# Summary
 summary(df_clean$log_delivery_time)
 ```
 
-After log-transforming our target variable, the distribution looks more symmetrical. The boxplot looks more compact and less outliers above the upper whisker. Furthermore we can see that Mean and Median are closer to each other.
+After log-transforming our target variable, the distribution looks more symmetrical. The boxplot looks more compact and has less outliers above the upper whisker. Furthermore, we can see that mean and median are closer to each other.
 
-Based on those observations (and the strong hint in our lecture notes) we decided to further proceed with the log transformed target variable.
+Based on these observations (and the strong hint in our lecture notes), we decided to further proceed with the log-transformed target variable.
 
-After investigating the target variable, we will check the distributions of the numeric predictors.
+After investigating the target variable, we now check the distributions of the numeric predictors.
 
 
-```{r, fig.width=12, fig.height=10, message=FALSE, warning=FALSE}
+```{r predictor_histograms, fig.width=12, fig.height=10, message=FALSE, warning=FALSE}
 # Select numeric variables for plot
 numeric_vars <- df_clean %>%
   select(distance_km, courier_age_years, courier_rating_1_to_5,
@@ -340,7 +339,7 @@ numeric_vars <- df_clean %>%
 # Plot distribution of numeric variables
 plots <- lapply(names(numeric_vars), function(var) {
   ggplot(df_clean, aes_string(x = var)) +
-    geom_histogram(bins = 30, fill = "gray70", color = "white") +
+    geom_histogram(bins = 30, fill = "steelblue", color = "white") +
     labs(title = var, x = var, y = "Count") +
     theme_minimal()
 })
@@ -349,13 +348,13 @@ plots <- lapply(names(numeric_vars), function(var) {
 wrap_plots(plots, ncol = 2)
 ```
 
-Looking at the different distributions, observe the following:
+Looking at the different distributions we observe the following:
 
-- distance_km: Most deliveries happen within ~ 5 - 20 km with a few extreme values beyond 40 km. This variable is right-skewed.
+- **distance_km:** Most deliveries happen within ~ 5 - 20 km with a few extreme values beyond 40 km. This variable is right-skewed.
 
 - **courier_age_years:** Rather uniform distribution in the range of ~20 to 40 years.
 
-- **courier_rating_1_to_5:** Most ratings are clustered near 5. This suggests that ratings a overall high wiht not too much variability. It could be that there is only limited predictive power from this predictor (to be further investigated).
+- **courier_rating_1_to_5:** Most ratings are clustered near 5. This suggests that ratings are overall high with not too much variability. It could be that there is only limited predictive power from this predictor (to be further investigated).
 
 - **temperature_celsius:** Centered around ~22°C, symmetrical shape
 
@@ -364,15 +363,15 @@ Looking at the different distributions, observe the following:
 - **precipitation_mm:** Many zero values which leads us to believe that there could be an error in the data. We will not use this predictor for further analysis.
 
 
-In a next step we will investigate the numeric predictors further by looking at scatter plots of each numeric predictor on the (log-transformed) target variable.
+In the next step we will investigate the numeric predictors further by looking at scatter plots of each numeric predictor on the (log-transformed) target variable.
 
-```{r, fig.width=12, fig.height=10, message=FALSE, warning=FALSE}
+```{r predictor_scatterplots, fig.width=12, fig.height=10, message=FALSE, warning=FALSE}
 
-# Select numeric predictors (withouh percipitation_mm)
+# Select numeric predictors (without precipitation_mm)
 numeric_predictors <- c("distance_km", "courier_age_years", "courier_rating_1_to_5",
                         "temperature_celsius", "humidity_percent")
 
-# Create scatter plots incl. correlation coefficiant
+# Create scatter plots incl. correlation coefficient
 scatter_plots <- lapply(numeric_predictors, function(var) {
   # Pearson-Korrelation berechnen (na.rm = TRUE für Sicherheit)
   cor_val <- round(cor(df_clean[[var]], df_clean$log_delivery_time, use = "complete.obs"), 2)
@@ -391,23 +390,23 @@ scatter_plots <- lapply(numeric_predictors, function(var) {
 wrap_plots(scatter_plots, ncol = 2)
 ```
 
-From looking at the plots, the correlation line and pearson r, we observe the following relationship with the log transformed target variable:
+From looking at the plots, the correlation line and Pearson's r, we observe the following relationship with the log-transformed target variable:
 
-- **log_delivery_time:** seems to be a strong positive relationship (r = 0.84). I.e. the farther the delivery distance, the longer the (log transformed) delivery time. This numeric predictor is the most improtant in our dataset.
+- **distance_km:** seems to be a strong positive relationship (r = 0.84). i.e. the farther the delivery distance, the longer the (log-transformed) delivery time. This numeric predictor is the most important in our data set.
 
-- **courier_rating_1_to_5:** there seems to be a rather weak negative relationship (r = 0.1). This could be interpreted that higher-rated couriers tend to delier slightly faster. However the effect seems very weak and the data is clustered around high ratings which could limit the usefulness of this predictor.
+- **courier_age_years:** There is essentially no correlation between the courier age and (log-transformed) delivery time (r = 0.01). 
 
-- **courier_age_years:** There is essentially no correlation between the courier age and (log transformed) delivery time (r = 0.01). 
+- **courier_rating_1_to_5:** there seems to be a rather weak negative relationship (r = 0.1). This could be interpreted that higher-rated couriers tend to deliver slightly faster. However the effect seems very weak and the data is clustered around high ratings which could limit the usefulness of this predictor.
 
-- **temperature_celsius:** there seems to be a very weak positive relationship (r = 0.06). Practically not meaninful.
+- **temperature_celsius:** there seems to be a very weak positive relationship (r = 0.06), practically not meaningful.
 
-- **humidity_percent:** There is essentially no correlation between humidity and delivery time (r = - 0.02, scattered flat line).
+- **humidity_percent:** There is essentially no correlation between humidity and delivery time (r = - 0.02, scattered points around flat line).
 
-Among all numeric predictors, only distance_km shows a strong (positive) linear relationship with the log-transformed delivery time. All other variables exhibit weak to negligible correlations.
+Among all numeric predictors, only `distance_km` shows a strong (positive) linear relationship with the log-transformed delivery time. All other variables exhibit weak to negligible correlations.
 
 
 For out categorical predictors we start by investigating the counts in each category.
-```{r, fig.width=12, fig.height=10, message=FALSE, warning=FALSE}
+```{r predictor_bar_charts, fig.width=12, fig.height=10, message=FALSE, warning=FALSE}
 
 # Relevel factor level in meaningful way
 df_clean$traffic_level_factor <- factor(
@@ -439,21 +438,21 @@ p4 <- ggplot(df_clean, aes(x = weather_category, fill = weather_category)) +
 (p1 / p2 / p3 / p4)
 ```
 
-Interpreting the "counts" plot above, we observe the following:
+From the bar charts above, we observe the following:
 
-- **order_type_factor:** all categories (Buffer, Drinks, Meal, Snack) are similarly frequent. There is no major imbalance. This means that our models can learn equally well across all order types.
+- **order_type_factor:** all categories (buffer, drinks, meal, snack) are similarly frequent. There is no major imbalance. This means that our models can learn equally well across all order types.
 
-- **vehicle_type_factor:** Motorcycles are the most preferred delivery method, followed by Scooters. Electric scooters and bicycles are rare. The only few data points for non-motorized vehicles may reduce model performance, this is to be kept in mind when fitting the different models.
+- **vehicle_type_factor:** Motorcycles are the most preferred delivery method, followed by scooters. Electric scooters and bicycles are rare. The only few data points for non-motorized vehicles may reduce model performance, this is to be kept in mind when fitting the different models.
 
-- **traffic_level_factor:** Most deliveries happen under moderate or high traffic. Very low traffic is the least frequent. Also here this imbalance needs to be kept in mind when fitting the model and splitting into test / training data.
+- **traffic_level_factor:** Most deliveries happen under moderate or high traffic. Very low traffic is the least frequent. Also here this imbalance needs to be kept in consideration when fitting the model and splitting into test / training data.
 
 - **weather_category:** Most deliveries happen in clear weather, while poor visibility and rain occur less often. 
 
 
 
-After looking at the counts of the categorical variables, we will look at the log tranformed delivery time by our categorial variables using boxplots.
+After looking at the counts of the categorical variables, we now look at the log-transformed delivery time versus our categorical variables using boxplots.
 
-```{r, fig.width=12, fig.height=14, message=FALSE, warning=FALSE}
+```{r predictor_boxplots, fig.width=12, fig.height=14, message=FALSE, warning=FALSE}
 
 # Create boxplots on delivery time by categorical variables
 b1 <- ggplot(df_clean, aes(x = order_type_factor, y = log_delivery_time, fill = order_type_factor)) +
@@ -481,17 +480,17 @@ b4 <- ggplot(df_clean, aes(x = weather_category, y = log_delivery_time, fill = w
 
 By visually inspecting the box plots we can make the following observations:
 
-- **order_type_factor:** Order types seem not to differ too much in regards to their log transformed delivery time. However we can see that "Drinks" take longer that the other factors. This may have many reasons, one could be that handling is slightly more difficult.
+- **order_type_factor:** Order types seem not to differ too much in regards to their log-transformed delivery time. However, we can see that "drinks" take longer that the other factors. One reason could be that handling might be more difficult for drinks.
 
-- **vehicle_type_factor:** A similar picture shows when looking at the vehicle type. Only bicycle seems to deviate with having a lower median in delivery time. However: a) the count of bicycles in the data is very low and also these few delivery jobs where a bicycle was used were for shorter distances (not displayed in this report).
+- **vehicle_type_factor:** A similar picture emerges when looking at the vehicle type. Only "bicycle" seems to deviate with having a lower median in delivery time. However, the count of bicycles in the data is very low. Moreover, these few delivery jobs where a bicycle was used were for shorter distances (not displayed in this report).
 
-- **delivery_time_factor:** There is a clear upward trend from factor "very low" to "very high". I.e. the median of log_delivery_time increases with the traffic intensity. Meaning: heavier traffic leads to longer delivery times.
+- **traffic_level_factor:** There is a clear upward trend from factor "very low" to "very high". i.e. the median of `log_delivery_time` increases with the traffic intensity. This would mean that heavier traffic leads to longer delivery times.
 
 - **weather_category:** For the weather category "clear" the median delivery time seems to be slightly longer than for the other two categories. However, there are also many more deliveries during clear weather in our data set.
 
-After observing that traffic_level seems to have a big impact we will investigate this further by creating a scatter plot of (log-transformed) delivery time on distance.
+Since we have observed that traffic level seems to have a big impact, we will investigate this further by creating a scatter plot of (log-transformed) delivery time against distance.
 
-```{r, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
+```{r distance_log_time_traffic_level, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
 # Create scatter on distance and time (log) with traffic level in colors
 ggplot(df_clean, aes(x = distance_km, y = log_delivery_time, color = traffic_level_factor)) +
   geom_point(alpha = 0.5) +
@@ -504,10 +503,10 @@ ggplot(df_clean, aes(x = distance_km, y = log_delivery_time, color = traffic_lev
   theme_minimal()
 ```
 
-From the plot above we can see that the same delivery distances take longer under heavier traffic conditions. This is a **hint for an interaction between distance_km and traffic_level**.
+From the plot above we can see that the same delivery distances take longer under heavier traffic conditions. This is a **hint for an interaction between `distance_km` and `traffic_level_factor`**.
 
 
-```{r, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
+```{r ggpairs, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
 
 # Create scatter plot matrix using ggpairs
 selected_cols <- c("courier_age_years",
@@ -515,16 +514,12 @@ selected_cols <- c("courier_age_years",
                    "temperature_celsius",
                    "humidity_percent",
                    "precipitation_mm",
-                   "distance_km",
-                   "delivery_time_min",
-                   "long_delivery_flag",
-                   "average_speed_kmph",
-                   "log_delivery_time")
+                   "distance_km")
 
 ggpairs(df_clean[, selected_cols])
 ```
 
-**Krzysztof**: I included the plot which we discussed for you. but the interpretation I would leave up to you for now ;-)
+As the above pairs plot displays no strong relationships between the continuous predictors and since all of the Pearson's correlation coefficients are low, we can conclude that no more interactions need to be included in the model.
 
 
 # 3. Modelling 
