@@ -14,3 +14,10 @@ knitr
 e1071
 tidyr
 stringr
+brglm2
+tidyverse
+tibble
+readr
+purrr
+forcats
+lubridate

@@ -1,0 +1,50 @@
+---
+title: "A Data-Driven Approach to Predicting Food Delivery Time: A Multi-Model Machine Learning Framework"
+author: "Krzysztof Baran, Curdin Caderas, Wenxing Xu"
+date: "2025-05-07"
+bibliography: references.bib
+csl: apa.csl
+output: 
+    html_document:
+      code_folding: hide
+    df_print: paged
+knitr: 
+  opts_chunk:
+    warning:false
+    message:false
+---
+
+As for the interpretation of these coefficients:
+
+* At reference level: (temperature_celsius = 0, distance_km = 0, order_type_factor = "Buffet", traffic_level_factor = "very low", weather_category = "Clear") the probability of a long delivery is:
+\[
+P = \frac{e^{-16.4}}{1 + e^{-16.4}} \approx 0
+\]
+
+* For each 10 degree increase in temperature, the odds increase by:
+\[
+P = e^{10 * 0.08359} \approx 2 \text{ times}
+\]
+
+* Similarly, for each 10 kilometres increase in distance, the odds increase by approx. 11 times.
+
+* When delivering a drink instead, the odds increase by:
+\[
+P = e^{7.51433} \approx 1,834 \text{ times}
+\]
+
+* Similarly for a meal instead, the odds decrease by approx. 51%.
+
+* Similarly for a snack instead, the odds increase by approx. 2 times.
+
+* Similarly for low traffic instead, the odds decrease by approx. 82%.
+
+* Similarly for moderate traffic instead, the odds increase by approx. 6 times.
+
+* Similarly for high traffic instead, the odds increase by approx. 27,421 times.
+
+* Similarly for very high traffic instead, the odds increase by approx. 16,278,568 times.
+
+* Similarly for poor visibility instead, the odds increase by approx. 56%.
+
+* Similarly for rainy weather instead, the odds increase by approx. 3 times.
