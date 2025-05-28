@@ -1628,8 +1628,7 @@ plot(df_clean$delivery_time_min, df_clean$pred_log_gam,
      xlab = "Actual", ylab = "Predicted",
      pch = 19, col = rgb(0.5, 0, 0.5, 0.3))
 abline(0, 1, col = "red", lwd = 2)
->>>>>>> Stashed changes
-
+```
 ## 3.4 Support Vector Machine
 
 In this section, we aim to classify the **traffic level** using SVM models.
@@ -1642,8 +1641,8 @@ We begin with the following steps:
 - Ensure the target variable is a factor
 - Split the data into a training and a test set using **stratified sampling**
 
-```{r}
 
+```{r}
 # Create input data for SVM
 svm_data <- df_clean %>%
   select(traffic_level_factor, distance_km, average_speed_kmph)
