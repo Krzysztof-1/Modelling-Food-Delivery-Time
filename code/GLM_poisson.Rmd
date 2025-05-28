@@ -17,13 +17,13 @@ knitr:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## 2. Generalised Linear Models (GLM) with Poisson Family 
+### 3.2.1. Generalised Linear Models (GLM) with Poisson Family 
 
-After first modeling with a linear model, we decided to conduct a further analysis on delivery speed. It is important to understand which variables significantly impact delivery speed: is it the weather conditions, traffic conditions, or even the type of vehicle? The variable `average_speed_kmph´ is derived by dividing `distance_km` by `delivery_time_min`, and then converted to an integer. In this case, `average_speed_kmph` meets the requirement for a Poisson model, which assumes count data as the response variable.
+After first modeling with a linear model, we decided to conduct a further analysis on delivery speed. It is important to understand which variables significantly impact delivery speed: is it the weather conditions, traffic conditions, or even the type of vehicle? The variable `average_speed_kmph` is derived by dividing `distance_km` by `delivery_time_min`, and then converted to an integer. In this case, `average_speed_kmph` meets the requirement for a Poisson model, which assumes count data as the response variable.
 
-### 2.1 Modeling
+#### 3.2.1.1 Modeling
 
-Before starting the modeling, the `traffic_level_factor` varialbe is convert to an unordered factor, and its reference level is set to ´Very Low´, so that all other traffic levels are compared against this baseline.
+Before starting the modeling, the `traffic_level_factor` variable is convert to an unordered factor, and its reference level is set to `Very Low`, so that all other traffic levels are compared against this baseline.
 
 In the initial Poisson model, continuous variables such as `courier_age_years`, `temperature_celsius`, `humidity_percent`, `precipitation_mm`, and `distance_km`, as well as categorical variables like `traffic_level_factor`, `vehicle_type_factor`, and `weather_category`, are included in the Poisson model in the first round to examine the validity of these predictors. The goal is to evaluate the significance of these variables in explaining variations in average_speed_kmph.
 The results showed in the model summary indicates that the p-values for `courier_age_years`, `precipitation_mm`, and `vehicle_type_factor` are greater than 0.05, suggesting that they do not contribute significantly to the model. Therefore, they will not be considered in the second round of modeling.
@@ -35,10 +35,11 @@ library(tidyverse)
 # read data
 df_clean <- read.csv("../data/cleaned_data.csv")
 
+
 #  Convert to unordered factor
 df_clean$traffic_level_factor <- factor(df_clean$traffic_level_factor, ordered = FALSE)
 #  Set the reference level
-df_clean$traffic_level_factor <- relevel(df_clean$traffic_level_factor, ref = "Very Low")
+df_clean$traffic_level_factor <- relevel(df_clean$traffic_level_factor, ref = "very low")
 
 # regression with glm poisson model
 poisson.model.test <- glm(
@@ -68,10 +69,10 @@ Overall, the second Poisson model is more parsimonious and performs better based
 - 0.006 \cdot \text{temperature_celsius} \\
 &- 0.002 \cdot \text{humidity_percent} 
 + 0.036 \cdot \text{distance_km} \\
-&+ 0.162 \cdot \text{traffic_level_factorHigh}
-+ 0.212 \cdot \text{traffic_level_factorLow} \\
-&+ 0.275 \cdot \text{traffic_level_factorModerate}
-- 0.143 \cdot \text{traffic_level_factorVery High} \\
+&+ 0.162 \cdot \text{traffic_level_factorhigh}
++ 0.212 \cdot \text{traffic_level_factorlow} \\
+&+ 0.275 \cdot \text{traffic_level_factormoderate}
+- 0.143 \cdot \text{traffic_level_factorvery high} \\
 &- 0.046 \cdot \text{weather_categoryPoorVisibility}
 - 0.072 \cdot \text{weather_categoryRainy})
 \end{aligned}
@@ -101,7 +102,7 @@ cat("Log(average_speed_kmph) = ", paste0(
 
 
 ```
-### 2.2 Interpretation of coefficients
+#### 3.2.1.2 Interpretation of coefficients
 Because the Poisson model uses a log-link function, the coefficients are first exponentiated. 
 
 - *Continous Variables*
@@ -125,10 +126,21 @@ For the ´weather_category´, ´weather_categoryClear´ was taken as the baselin
 
 ```{r}
 #++++++++++++++++++++++++++++++++++++++++++  
+
+names(coef(poisson.model))
+
 #coefficients of the poisson Mode
 # first on traffic_level_factor
-coef(poisson.model)[c("traffic_level_factorHigh", "traffic_level_factorLow","traffic_level_factorModerate", "traffic_level_factorVery High")]
-exp(coef(poisson.model)[c("traffic_level_factorHigh", "traffic_level_factorLow","traffic_level_factorModerate", "traffic_level_factorVery High")]) %>% round(digits = 2)
+coef(poisson.model)[c("traffic_level_factorhigh", 
+                      "traffic_level_factorlow", 
+                      "traffic_level_factormoderate", 
+                      "traffic_level_factorvery high")]
+
+exp(coef(poisson.model)[c("traffic_level_factorhigh", 
+                          "traffic_level_factorlow", 
+                          "traffic_level_factormoderate", 
+                          "traffic_level_factorvery high")]) %>% round(digits = 2)
+
 # then on weather_category
 coef(poisson.model)[c("weather_categoryPoor Visibility", "weather_categoryRainy")]
 exp(coef(poisson.model)[c("weather_categoryPoor Visibility", "weather_categoryRainy")]) %>% round(digits = 2)
@@ -138,7 +150,7 @@ exp(coef(poisson.model)[c("temperature_celsius", "humidity_percent","distance_km
 ```
 
 
-### 2.3 Comparison of Real vs. Simulated Delivery Speeds by Traffic Level
+#### 3.2.1.3 Comparison of Real vs. Simulated Delivery Speeds by Traffic Level
 
 To assess the adequacy of the Poisson regression model, we simulate delivery speeds using the fitted model and compare them to the actual observed values. Specifically, predicted values of average_speed_kmph are generated via the simulate() function based on the fitted Poisson model. A combined dataset is then constructed that includes both the real and simulated values, with traffic_level_factor as the grouping variable.
 
@@ -177,7 +189,7 @@ df_plot_combined <- bind_rows(
 # ensures the plot uses the correct order
 df_plot_combined$Traffic_Level <- factor(
   df_plot_combined$Traffic_Level,
-  levels = c("Very Low", "Low", "Moderate", "High", "Very High"),
+  levels = c("very low", "low", "moderate", "high", "very high"),
   ordered = TRUE
 )
 
@@ -194,4 +206,55 @@ ggplot(df_plot_combined, aes(x = Traffic_Level, y = speed, fill = Type)) +
   theme_minimal()
 ```
 
+#### 3.2.1.4 Residual Analysis
 
+To evaluate the adequacy of the Poisson regression model, we conducted a residual analysis using deviance, Pearson, and raw residuals.
+
+**Predicted vs. Deviance Residuals**
+We visualized deviance residuals against the predicted delivery speeds to assess model fit. The residuals appear randomly scattered around zero, with no strong systematic patterns, indicating that the model captures the main structure in the data adequately. A slight fan shape at higher predicted values could hint at heteroskedasticity, but the effect is minor.
+
+**Distribution of Deviance Residuals**
+We examined the distribution of deviance residuals using a histogram. The distribution is approximately symmetric and centered around zero, which supports the assumption that the model residuals are unbiased and randomly distributed.
+
+While the shape is roughly bell-shaped, there are a few mild outliers (e.g., residuals beyond ±5), but their frequency is very low. This suggests that the Poisson model fits the majority of observations well, no severe skewness or kurtosis is evident in the residuals, outlier influence is limited, and the model is robust to most individual observations.
+
+**Overdispersion Check**
+To check for overdispersion, we calculated the overdispersion statistic using Pearson residuals. The resulting overdispersion ratio is 0.83. Since this value is less than 1, it suggests underdispersion — meaning the observed variance in the data is slightly lower than what the Poisson distribution assumes. This is not problematic and indicates that the model may be slightly conservative in its variance estimation but overall remains valid.
+
+**Conclusion**
+The residual diagnostics show no major issues with model specification. The model appears to fit the data reasonably well, with no evidence of significant overdispersion or major misspecification.
+```{r}
+
+# residual analysis
+# 1.compute residuals
+df_clean$residuals_raw <- residuals(poisson.model, type = "response")   # raw residuals
+df_clean$residuals_deviance <- residuals(poisson.model, type = "deviance")  # deviance residuals
+df_clean$residuals_pearson <- residuals(poisson.model, type = "pearson")  # for overdispersion check
+df_clean$predicted_speed_kmph <- predict(poisson.model, type = "response") # Compute predicted values
+
+# 2. Plot: Predicted vs. Residuals
+ggplot(df_clean, aes(x = predicted_speed_kmph, y = residuals_deviance)) +
+  geom_point(alpha = 0.4, color = "darkorange") +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    title = "Deviance Residuals vs. Predicted Speed",
+    x = "Predicted Speed (km/h)",
+    y = "Deviance Residuals"
+  ) +
+  theme_minimal()
+
+# 3. Histogram of Residuals
+ggplot(df_clean, aes(x = residuals_deviance)) +
+  geom_histogram(bins = 50, fill = "steelblue", color = "black") +
+  labs(
+    title = "Histogram of Deviance Residuals",
+    x = "Deviance Residuals",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+# 4. Check for Overdispersion
+overdispersion <- sum(residuals(poisson.model, type = "pearson")^2) / poisson.model$df.residual
+overdispersion  # > 1 suggests overdispersion; if >>1, Poisson may not be appropriate
+
+```

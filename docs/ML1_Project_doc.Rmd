@@ -1120,6 +1120,7 @@ ggplot(df_plot_combined, aes(x = Traffic_Level, y = speed, fill = Type)) +
   ) +
   theme_minimal()
 ```
+
 #### 3.2.1.4 Residual Analysis
 
 To evaluate the adequacy of the Poisson regression model, we conducted a residual analysis using deviance, Pearson, and raw residuals.
@@ -1222,6 +1223,7 @@ It turns out that certain classes of `traffic_level_factor` perfectly estimate `
 table(df_clean_binomial$long_delivery_flag, df_clean_binomial$traffic_level_factor)
 ```
 
+<<<<<<< Updated upstream
 This is problematic as it means that the maximum likelihood estimate (MLE) for the coefficients corresponding to the factor levels of `traffic_level_factor` does not exist and the model fails to converge. As a result, the interpretation of coefficients becomes unstable and meaningless. I decided to progress with a more robust solution: Firth’s correction (bias-reduced logistic regression) implemented with the `brglm2::brglmFit` method.
 
 ```{r}
@@ -1327,6 +1329,306 @@ P = e^{7.51433} \approx 1,834 \text{ times}
 
 
 ## 3.3 Generalized Additive Models
+=======
+
+## 3.3. Generalised Additive Models (GAM) 
+
+After analyzing the linear model and the generalized linear model (GLM), we will now explore a more flexible and potentially more powerful approach: the Generalized Additive Model (GAM). Our goal is to improve the prediction of the target variable — `delivery_time_min`. As before, we will use the `df_clean.csv` dataset, which has been cleaned and preprocessed from the raw data. The `gam()` function is found in the `{mgcv}` package. 
+
+### 3.3.1 Modeling
+
+For the GAM modeling, several options can be incorporated into the model: the smoother `s()` function can be applied to continuous variables, and interactions between variables can also be considered. In the linear model, the target variable `delivery_time_min` was log-transformed. Therefore, in the GAM models, both the original and log-transformed versions of the target variable will be compared in terms of their outcomes. Due to space limitations in this document, only three selected models are presented in this chapter, and their results are compared.
+
+**Gam model 1**
+
+First, all continuous and categorical variables are included in an initial GAM to examine their p-values and assess which variables significantly contribute to the model and which do not. The model summary is obtained using `summary(gam.model.test1)`. Since no smooth functions s() included in `gam.model.test1`, it's equivalent to a linear model. 
+
+The first round of results shows that the adjusted R-squared is 0.858. The statistically significant predictors, marked with '***', include the 'Intercept', 'temperature_celsius', 'humidity_percent', 'distance_km', and 'traffic_level_factor', suggesting they have a meaningful impact on delivery time. In contrast, variables such as 'courier_age_years', 'precipitation_mm', 'vehicle_type_factor', and 'weather_category' have p-values greater than 0.05 and therefore do not significantly contribute to the model. These non-significant variables will be excluded in the next modeling steps. 
+
+```{r, warning=FALSE, message=FALSE}
+# again loading the cleaned data as df_clean
+df_clean <- read.csv("../data/cleaned_data.csv")
+# loading {mgcv} package for the gam() function
+library(mgcv)
+# 1st trial gam modeling with all possible variables
+gam.model.test1 <- gam(delivery_time_min ~ courier_age_years + temperature_celsius + humidity_percent 
+                       + precipitation_mm + distance_km + traffic_level_factor 
+                       + vehicle_type_factor + weather_category,
+          data = df_clean)
+summary(gam.model.test1)
+```
+**Gam model 2, integrate smoother**
+
+In the second attempt, we include only the statistically significant variables identified previously. Additionally, we apply the `s()` function to all continuous variables — `temperature_celsius`, `humidity_percent`, and `distance_km` — to allow for flexible, non-linear relationships using smooth terms. To avoid overfitting, we use `bs = "cs"` (cubic regression splines with shrinkage), and set `k = 5` to limit the maximum allowable complexity for each smooth term.
+
+Comparing the summary outputs of the two models, the GCV (Generalized Cross-Validation score) decreased from 39.086 to 33.274. GCV is especially useful for GAMs, as it directly relates to prediction error. A lower GCV indicates a better balance between goodness-of-fit and smoothness penalty (@clark_gam, @statisticsglobe_gcv, @crossvalidated_gcv). Additionally, the adjusted R-squared increased from 0.858 to 0.879, further indicating improved model performance.
+
+The anova() function was used to compare the two models. This test assesses whether the more flexible model (Model 2) offers a statistically significant improvement in fit over the simpler one (Model 1). The F-statistic is large (397.3) and the p-value is extremely small (p < 2.2e-16), indicating that the inclusion of smooth functions in Model 2 significantly improves the fit, even though fewer predictors are included. The Df Deviance value, which represents the difference in residual deviance between the two models, is 52,579, again suggesting a better fit.
+
+Lastly, comparing the AIC (Akaike Information Criterion), the value decreased from 58,762 (Model 1) to 57,308 (Model 2). Since lower AIC values indicate a better trade-off between model fit and complexity, this further supports Model 2 as the preferred model.
+
+```{r}
+# 2nd Attempt: Model with Selected Variables and Smooth Terms
+gam.model.test2 <- gam(delivery_time_min ~ s(temperature_celsius, bs = "cs", k=5) + 
+                         s(humidity_percent, bs = "cs", k=5) + 
+                         s(distance_km, bs = "cs", k=5) + 
+                         traffic_level_factor + 
+                         weather_category,
+                       data = df_clean) 
+# print the summary
+summary(gam.model.test2)
+
+# model comparing test1 and test2
+anova(gam.model.test1, gam.model.test2, test = "F")
+AIC(gam.model.test1, gam.model.test2)
+
+library(knitr)
+
+# Create data frame
+model_comparison <- data.frame(
+  MODEL = c("gam.model.test1", "gam.model.test2"),
+  AIC = c(58762.26, 57307.94),
+  GCV = c(39.086, 33.274),
+  R2 = c(0.858, 0.879)
+)
+
+# Print the table
+kable(model_comparison, digits = 2, align = 'c', caption = "Model Comparison: gam.model.test1 vs gam.model.test2")
+```
+
+**Gam model 3, integrate interactions**
+
+In the next step, interactions between predictors will be analyzed and selected for modeling. After testing several trial models, we compare two interaction candidates to evaluate their improvement over the existing model, `gam.model.test2`. The interactions `temperature_celsius:humidity_percent` and `distance_km:traffic_level_factor` are included in `gam.model.test6`, while only `temperature_celsius:humidity_percent` is included in `gam.model.test8`. Their performance is compared using the same criteria: anova(), AIC, and GCV values.
+
+Two generalized additive models (GAMs) were compared to assess the effect of including interaction terms. `gam.model.test6` includes both interactions `temperature_celsius: humidity_percent` and `distance_km:traffic_level_factor`, while `gam.model.test8` includes only the first interaction.
+
+`gam.model.test6` has a slightly lower AIC (57247.91 vs. 57264.50) and marginally better GCV (33.05 vs. 33.12), indicating a minor improvement in model fit. Both models achieve the same R² value of 0.88, suggesting equal explanatory power.
+
+The interaction `temperature_celsius:humidity_percent` is statistically significant (p < 0.001) and suggests that higher temperature combined with higher humidity slightly decreases delivery time.
+
+All interaction terms involving `distance_km:traffic_level_factor` in `gam.model.test6` are not statistically significant (p > 0.23), implying they do not contribute meaningful information.
+
+Smooth term plots are consistent across models: temperature and humidity show modest nonlinear effects, while distance has a stronger positive effect in `gam.model.test8`.
+
+Although `gam.model.test6` fits slightly better, the improvement is minimal, and the added complexity from the insignificant distance_km:traffic_level_factor interaction is not justified.
+
+Therefore, `gam.model.test8` is preferable for its simplicity and comparable performance. It retains the significant interaction and avoids unnecessary terms that may lead to overfitting.
+
+```{r}
+# 6th fitting, include recommended interations to the GAM with shrinkage of cyclic spline
+gam.model.test6 <- gam(delivery_time_min ~       s(temperature_celsius, bs = "cs", k=5) + 
+                                                 s(humidity_percent, bs = "cs", k=5) + 
+                                                 s(distance_km, bs = "cs", k=5) + 
+                                                 traffic_level_factor + 
+                                                 weather_category +
+                                                 temperature_celsius:humidity_percent +
+                                                 distance_km:traffic_level_factor,
+                                                 data = df_clean)
+summary(gam.model.test6)
+#  visualize the smooth terms, Plot all smooth terms with confidence intervals 
+plot(gam.model.test6, pages = 1, se = TRUE, rug = TRUE, main="Smooth Terms of GAM Model Test 6")
+
+# 8th continue after 6th, remove insignificant variables
+gam.model.test8 <- gam(delivery_time_min ~       s(temperature_celsius, bs = "cs", k=5) + 
+                         s(humidity_percent, bs = "cs", k=5) + 
+                         s(distance_km, bs = "cs", k=5) + 
+                         traffic_level_factor + 
+                         weather_category +
+                         temperature_celsius:humidity_percent,
+                       data = df_clean)
+summary(gam.model.test8)
+#  visualize the smooth terms, Plot all smooth terms with confidence intervals 
+plot(gam.model.test8, pages = 1, se = TRUE, rug = TRUE, main="Smooth Terms of GAM Model Test 8")
+
+# model comparing test1 and test2
+anova(gam.model.test6, gam.model.test8, test = "F")
+AIC(gam.model.test6, gam.model.test8)
+
+
+# Create data frame
+model_comparison <- data.frame(
+  MODEL = c("gam.model.test6", "gam.model.test8"),
+  AIC = c(57247.91, 57264.50),
+  GCV = c(33.054, 33.115),
+  R2 = c(0.88, 0.879)
+)
+
+# Print the table
+kable(model_comparison, digits = 2, align = 'c', caption = "Model Comparison: gam.model.test6 vs gam.model.test8")
+```
+
+**Gam model 4, integrate log transformation on target variable**
+In the linear model, the target variable delivery_time_min was log-transformed to improve model performance (see Section 3.1). We apply the same transformation to gam.model.test8, resulting in gam.model.logtest8, and compare the performance to the untransformed version.
+
+The model is fitted using the log-transformed delivery time (log_delivery_time) as the response variable while retaining the same predictors and interaction term (temperature_celsius:humidity_percent).
+
+The model achieves a high adjusted R² of 0.886, indicating that 88.6% of the variance in log-transformed delivery time is explained by the model. The GCV score is 0.0255, showing a low level of prediction error, which suggests `gam.model.logtest8` is a robust choice for modeling delivery time.
+
+```{r}
+# Adding log transformed delivery time to d.food_time
+library(tidyverse)
+df_clean <- df_clean %>%
+  mutate(log_delivery_time = log(delivery_time_min))
+# 8th continue after 6th, remove insignificant variables
+gam.model.logtest8 <- gam(log_delivery_time ~       s(temperature_celsius, bs = "cs", k=5) + 
+                         s(humidity_percent, bs = "cs", k=5) + 
+                         s(distance_km, bs = "cs", k=5) + 
+                         traffic_level_factor + 
+                         weather_category +
+                         temperature_celsius:humidity_percent,
+                       data = df_clean)
+summary(gam.model.logtest8)
+```
+
+
+### 3.3.2 Model Comparison and Evaluation
+
+To evaluate the performance of different modeling approaches for predicting delivery time, three models were compared using RMSE (Root Mean Squared Error) and MAE (Mean Absolute Error) on a held-out test set:
+
+-- Linear Model (`gam.model.test1`) – A simple GAM without smoothing terms, treating all predictors as linear.
+
+-- GAM on Original Scale (`gam.model.test8`) – A flexible GAM using cubic regression splines (bs = "cs") for numeric predictors and including an interaction between temperature and humidity.
+
+-- GAM with Log-Transformed Target (`gam.model.logtest8`) – Same as test8, but applied to a log-transformed delivery time to account for potential skewness and stabilize variance.
+
+The results show:
+
+The log-transformed GAM model achieved the lowest RMSE (5.69) and lowest MAE (4.24), indicating the best predictive accuracy overall. The GAM on the original scale (test8) also performed better than the linear model, suggesting that including non-linear effects improves model fit. The linear model (test1) showed the highest error rates, confirming that linear assumptions are too restrictive for this problem.
+
+Overall, the results suggest that: Applying a log transformation to the target variable can further improve performance, likely due to reducing the influence of outliers and heteroscedasticity. These findings support the use of flexible models such as GAMs, especially when paired with appropriate transformations of the response variable.
+
+```{r}
+
+library(caret)  # Für createDataPartition
+library(mgcv)  # Für Generalized Additive Models
+library(dplyr)
+#  ---- For linear model test  ----
+set.seed(99)
+train_index <- createDataPartition(df_clean$delivery_time_min, p = 0.8, list = FALSE)
+train_data <- df_clean[train_index, ]
+test_data <- df_clean[-train_index, ]
+
+gam.model.traintest1 <- gam(delivery_time_min ~ 
+                              temperature_celsius + 
+                              humidity_percent + 
+                              distance_km + 
+                              traffic_level_factor + 
+                              weather_category, 
+                            data = train_data,
+                            method = "REML")
+                              
+pred_test1 <- predict(gam.model.traintest1, newdata = test_data)
+
+RMSE_test1 <- sqrt(mean((pred_test1 - test_data$delivery_time_min)^2))
+MAE_test1 <- mean(abs(pred_test1 - test_data$delivery_time_min))
+
+
+# ---- For test8  ----
+set.seed(100)
+train_index <- createDataPartition(df_clean$delivery_time_min, p = 0.8, list = FALSE)
+train_data <- df_clean[train_index, ]
+test_data <- df_clean[-train_index, ]
+
+gam.model.traintest8 <- gam(delivery_time_min ~
+                              s(temperature_celsius, bs = "cs", k=5) + 
+                              s(humidity_percent, bs = "cs", k=5) + 
+                              s(distance_km, bs = "cs", k=5) + 
+                              traffic_level_factor + 
+                              weather_category +
+                              temperature_celsius:humidity_percent,
+                            data = train_data,
+                            method = "REML")
+
+pred_test8 <- predict(gam.model.traintest8, newdata = test_data)
+
+RMSE_test8 <- sqrt(mean((pred_test8 - test_data$delivery_time_min)^2))
+MAE_test8 <- mean(abs(pred_test8 - test_data$delivery_time_min))
+
+
+# ---- For log transformation logtest8 ----
+set.seed(101)
+train_index <- createDataPartition(df_clean$log_delivery_time, p = 0.8, list = FALSE)
+train_data <- df_clean[train_index, ]
+test_data <- df_clean[-train_index, ]
+
+gam.model.trainlogtest8 <- gam(log_delivery_time ~
+                                 s(temperature_celsius, bs = "cs", k=5) + 
+                                 s(humidity_percent, bs = "cs", k=5) + 
+                                 s(distance_km, bs = "cs", k=5) + 
+                                 traffic_level_factor + 
+                                 weather_category +
+                                 temperature_celsius:humidity_percent,
+                               data = train_data,
+                               method = "REML")
+
+pred_logtest8 <- predict(gam.model.trainlogtest8, newdata = test_data)
+pred_logtest8_back <- exp(pred_logtest8)
+
+RMSE_logtest8 <- sqrt(mean((pred_logtest8_back - test_data$delivery_time_min)^2))
+MAE_logtest8 <- mean(abs(pred_logtest8_back - test_data$delivery_time_min))
+
+
+# ---- Model Comparison Table ----
+data.frame(
+  Model = c("Linear model (test 1)", "Original Scale (test8)", "Log-Transformed (logtest8)"),
+  RMSE = c(RMSE_test1, RMSE_test8, RMSE_logtest8),
+  MAE = c(MAE_test1, MAE_test8, MAE_logtest8)
+)
+
+
+```
+
+**visualization**
+
+
+```{r}
+# Predicted values
+df_clean$pred_lm      <- predict(gam.model.traintest1, newdata = df_clean)
+df_clean$pred_gam     <- predict(gam.model.traintest8, newdata = df_clean)
+df_clean$pred_log_gam <- exp(predict(gam.model.trainlogtest8, newdata = df_clean))
+
+# Residuals
+df_clean$resid_lm      <- df_clean$delivery_time_min - df_clean$pred_lm
+df_clean$resid_gam     <- df_clean$delivery_time_min - df_clean$pred_gam
+df_clean$resid_log_gam <- df_clean$delivery_time_min - df_clean$pred_log_gam
+
+# ----- Residual Plots -----
+par(mfrow = c(1, 3))
+
+plot(df_clean$resid_lm, 
+     main = "Residuals: Linear Model", 
+     ylab = "Residuals", xlab = "Index", col = "darkgreen", pch = 20)
+
+plot(df_clean$resid_gam, 
+     main = "Residuals: Smooth GAM", 
+     ylab = "Residuals", xlab = "Index", col = "blue", pch = 20)
+
+plot(df_clean$resid_log_gam, 
+     main = "Residuals: Log-Transformed GAM", 
+     ylab = "Residuals", xlab = "Index", col = "purple", pch = 20)
+
+
+# ----- Predicted vs Actual -----
+par(mfrow = c(1, 3))
+
+plot(df_clean$delivery_time_min, df_clean$pred_lm,
+     main = "Linear Model",
+     xlab = "Actual", ylab = "Predicted",
+     pch = 19, col = rgb(0, 0.6, 0, 0.3))
+abline(0, 1, col = "red", lwd = 2)
+
+plot(df_clean$delivery_time_min, df_clean$pred_gam,
+     main = "Smooth GAM (Original)",
+     xlab = "Actual", ylab = "Predicted",
+     pch = 19, col = rgb(0, 0, 1, 0.3))
+abline(0, 1, col = "red", lwd = 2)
+
+plot(df_clean$delivery_time_min, df_clean$pred_log_gam,
+     main = "Log-Transformed GAM",
+     xlab = "Actual", ylab = "Predicted",
+     pch = 19, col = rgb(0.5, 0, 0.5, 0.3))
+abline(0, 1, col = "red", lwd = 2)
+>>>>>>> Stashed changes
 
 ## 3.4 Support Vector Machine
 

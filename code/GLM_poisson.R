@@ -1,5 +1,6 @@
 getwd()
 # Generalised Linear Model Poisson – Regression on average_speed_kmph
+library(dplyr)
 df_clean <- read.csv("../data/cleaned_data.csv")
 dim(df_clean)
 head(df_clean)
@@ -9,20 +10,37 @@ table(df_clean$traffic_level_factor, useNA = "always")
 levels(df_clean$traffic_level_factor)
 summary(df_clean$traffic_level_factor)
 
+df_clean <- df_clean %>%
+  mutate(
+    traffic_level_factor = factor(traffic_level_factor),
+    vehicle_type_factor = factor(vehicle_type_factor),
+    weather_category = factor(weather_category)
+  )
+
+levels(df_clean$traffic_level_factor)
+str(df_clean$traffic_level_factor)
+
+
 # Fix factor ordering in the original dataframe
 df_clean$traffic_level_factor <- factor(
   df_clean$traffic_level_factor,
-  levels = c("Very Low", "Low", "Moderate", "High", "Very High"),
+  levels = c("very low", "low", "moderate", "high", "very high"),
   ordered = TRUE
 )
 
+sapply(df_clean[, c("traffic_level_factor", "vehicle_type_factor", "weather_category")], levels)
+
+#  Convert to unordered factor
+df_clean$traffic_level_factor <- factor(df_clean$traffic_level_factor, ordered = FALSE)
+#  Set the reference level
+df_clean$traffic_level_factor <- relevel(df_clean$traffic_level_factor, ref = "very low")
+
 # regression with glm poisson model
 poisson.model.test <- glm(
-  average_speed_kmph ~ courier_age_years + temperature_celsius + humidity_percent + precipitation_mm +
-    distance_km + traffic_level_factor + vehicle_type_factor +
-    weather_category,
+  average_speed_kmph ~ courier_age_years + temperature_celsius + humidity_percent +
+    precipitation_mm + distance_km + traffic_level_factor + vehicle_type_factor,
   data = df_clean,
-  family = poisson(link="log")
+  family = poisson(link = "log")
 )
 
 # check model summary
@@ -63,7 +81,7 @@ df_plot <- data.frame(
 
 # set order of traffic levels
 df_plot$Traffic_Level <- factor(df_plot$Traffic_Level,
-    levels = c("Very Low", "Low", "Moderate", "High", "Very High")
+    levels = c("very low", "low", "moderate", "high", "very high")
     )
 
 # Create the boxplot grouped by traffic level
@@ -82,12 +100,12 @@ eff <- allEffects(poisson.model)
 # Fix x-axis factor level order
 eff[["traffic_level_factor"]]$x$traffic_level_factor <- factor(
   eff[["traffic_level_factor"]]$x$traffic_level_factor,
-  levels = c("Very Low", "Low", "Moderate", "High", "Very High"),
+  levels = c("very low", "low", "moderate", "high", "very high"),
   ordered = TRUE
 )
 
 # Fix internal effect levels as well
-eff[["traffic_level_factor"]]$xlevels$traffic_level_factor <- c("Very Low", "Low", "Moderate", "High", "Very High")
+eff[["traffic_level_factor"]]$xlevels$traffic_level_factor <- c("very low", "low", "moderate", "high", "very high")
 
 # Now plot
 #plot(eff, multiline = TRUE)
