@@ -52,6 +52,9 @@ library(e1071)
 library(tidyr)
 library(stringr)
 library(brglm2)
+library(mgcv)
+#suppressPackageStartupMessages(library(tidyverse))
+#library(tidyverse)
 
 
 # Load the raw data
@@ -96,24 +99,7 @@ To visualize the geographic distribution of these observations, we first defined
 Figure 4 displays all restaurant and delivery locations overlaid on the background map from Figure 3. The plotted points indicate that the observations were collected from 22 cities across India, including major urban centers such as New Delhi, Mumbai, Bangalore, Kolkata, and Chennai.
 
 
-```{r geographic_filtering, warning=FALSE, message=FALSE, exec = FALSE}
-
-# Histogram for Restaurant Latitude
-hist(df.food_time$restaurant_latitude_deg,
-     main = "Figure 1: Distribution of Restaurant Latitudes",
-     xlab = "Restaurant Latitude",
-     ylab = "Frequency",
-     col = "steelblue",
-     border = "black")
-
-# Histogram for Restaurant Longitude
-hist(df.food_time$restaurant_longitude_deg,
-     main = "Figure 2: Distribution of Restaurant Longitudes",
-     xlab = "Restaurant Longitude",
-     ylab = "Frequency",
-     col = "steelblue",
-     border = "black")
-
+```{r geographic_filtering, fig.height=4, fig.align='center', warning=FALSE, message=FALSE, exec = FALSE}
 # Clean the data by filtering for geographic coordinates
 df.food_time.clean <- df.food_time %>%
   filter(
@@ -141,16 +127,6 @@ example.map <- get_tiles(bbox.sf, provider = "OpenStreetMap")
 # Extract bounding box limits
 bbox.limits <- st_bbox(bbox.sf)
 
-
-# Figure 3: Plot the background map
-ggplot() +
-  layer_spatial(data = example.map) +
-  coord_sf(xlim = bbox.limits[c(1, 3)], ylim = bbox.limits[c(2, 4)]) +
-  labs(title = "Figure 3: Background Map with Tiles", x = "Longitude", y = "Latitude") +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5))
-
-
 # Figure 4: Plot restaurant and delivery locations on the map
 ggplot() +
   layer_spatial(data = example.map) +
@@ -161,7 +137,7 @@ ggplot() +
              aes(x = customer_longitude_deg, y = customer_latitude_deg),
              color = "red", size = 2, alpha = 0.7, shape = 16) +
   coord_sf(xlim = bbox.limits[c(1, 3)], ylim = bbox.limits[c(2, 4)]) +
-  labs(title = "Figure 4: Restaurant and Delivery Locations",
+  labs(title = "Figure 1: Restaurant and Delivery Locations",
        x = "Longitude", y = "Latitude") +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5))
@@ -246,15 +222,9 @@ df_clean <- df.food_time.clean %>%
     average_speed_kmph = as.integer(if_else(delivery_time_min > 0, distance_km * 60 / delivery_time_min, NA_real_))
   ) %>%
   drop_na()
+```
 
-
-# Now check structure
-str(df_clean)
-
-# Check structure after cleaning
-str(df_clean)
-
-
+```{r data_info, collapse=TRUE}
 # Check for missing values in cleaned data & str
 colSums(is.na(df_clean))
 str(df_clean)
@@ -331,7 +301,7 @@ Based on these observations (and the strong hint in our lecture notes), we decid
 After investigating the target variable, we now check the distributions of the numeric predictors.
 
 
-```{r predictor_histograms, fig.width=12, fig.height=10, message=FALSE, warning=FALSE}
+```{r predictor_histograms, fig.width=12, fig.height=8, message=FALSE, warning=FALSE}
 # Select numeric variables for plot
 numeric_vars <- df_clean %>%
   select(distance_km, courier_age_years, courier_rating_1_to_5,
@@ -346,7 +316,7 @@ plots <- lapply(names(numeric_vars), function(var) {
 })
 
 # Arrange plots (using patchwork)
-wrap_plots(plots, ncol = 2)
+wrap_plots(plots, ncol = 3)
 ```
 
 Looking at the different distributions we observe the following:
@@ -366,7 +336,7 @@ Looking at the different distributions we observe the following:
 
 In the next step we will investigate the numeric predictors further by looking at scatter plots of each numeric predictor on the (log-transformed) target variable.
 
-```{r predictor_scatterplots, fig.width=12, fig.height=10, message=FALSE, warning=FALSE}
+```{r predictor_scatterplots, fig.width=12, fig.height=8, message=FALSE, warning=FALSE}
 
 # Select numeric predictors (without precipitation_mm)
 numeric_predictors <- c("distance_km", "courier_age_years", "courier_rating_1_to_5",
@@ -388,7 +358,7 @@ scatter_plots <- lapply(numeric_predictors, function(var) {
     theme_minimal()
 })
 # Arrange plots (using patchwork)
-wrap_plots(scatter_plots, ncol = 2)
+wrap_plots(scatter_plots, ncol = 3)
 ```
 
 From looking at the plots, the correlation line and Pearson's r, we observe the following relationship with the log-transformed target variable:
@@ -594,12 +564,9 @@ $$
 lm.delivery1 <- lm(log_delivery_time ~ distance_km + courier_rating_1_to_5 + traffic_level_factor + order_type_factor, data = train_data)
 ```
 
-```{r}
+```{r, collapse=TRUE}
 # Model 1: Coefficients
-kable(
-  tidy(lm.delivery1),
-  caption = "Model 1 (`lm.delivery1`): Coefficient estimates"
-)
+lm.delivery1
 ```
 
 #### Interpretation of model `lm.delivery1`
@@ -680,7 +647,7 @@ Overall, this suggests that the model fits the data very well and explains most 
 
 We created two diagnostic plots to assess the quality of our model:
 
-```{r}
+```{r, fig.width=12, fig.height = 6}
 # diagnostic plots
 
 # prepare data
@@ -690,7 +657,7 @@ df_plot <- data.frame(
 )
 
 # Plot: residuals vs Fitted
-ggplot(df_plot, aes(x = fitted, y = residuals)) +
+p1 <- ggplot(df_plot, aes(x = fitted, y = residuals)) +
   geom_point(alpha = 0.3) +
   geom_hline(yintercept = 0, color = "red", linetype = "dashed") +
   labs(title = "Residuals vs Fitted",
@@ -698,9 +665,14 @@ ggplot(df_plot, aes(x = fitted, y = residuals)) +
        y = "Residuals") +
   theme_minimal()
 
-# QQ-Plot to check if residuals are normally distributed
-qqnorm(resid(lm.delivery1))
-qqline(resid(lm.delivery1), col = "red")
+# Create the Q-Q plot using ggplot2
+p2 <- ggplot(df_plot, aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  labs(title = "Q-Q Plot of Residuals", x = "Theoretical Quantiles", y = "Sample Quantiles") +
+  theme_minimal()
+
+p1 + p2
 ```
 
 1. **Residuals vs Fitted Values**  
@@ -721,7 +693,7 @@ We do not observe any severe violations of linear model assumptions. Therefore, 
 
 To assess the impact of individual variables, we use the `drop1()` function. This allows us to test the effect of removing each predictor while keeping the others constant.
 
-```{r}
+```{r, collapse=TRUE}
 # using drop1() on first linear model
 drop1(lm.delivery1, test = "F")
 ```
@@ -736,18 +708,11 @@ This suggests that excluding `courier_rating_1_to_5` does not worsen the model a
 
 We therefore fit a second model `lm.delivery2`, without `courier_rating_1_to_5`. 
 
-```{r}
-# simplifying the model
-
-lm.delivery2 <- update(lm.delivery1, . ~ . - courier_rating_1_to_5)
-```
-```{r}
+```{r, collapse=TRUE}
+# Simplifying the model
 # Model 2: Coefficients
-kable(
-  tidy(lm.delivery2),
-  caption = "Model 2 (`lm.delivery2`): Coefficient estimates"
-)
-
+lm.delivery2 <- update(lm.delivery1, . ~ . - courier_rating_1_to_5)
+lm.delivery2
 ```
 
 
@@ -789,16 +754,12 @@ This model includes:
 - Main effects of `distance_km`, `traffic_level_factor`, and `order_type_factor`
 - All interaction terms between `distance_km` and `traffic_level_factor`
 
-```{r}
+```{r, collapse=TRUE}
 # Including interaction between distance_km and traffic_level_factor
 lm.interaction <- lm(log_delivery_time ~ distance_km * traffic_level_factor + order_type_factor, data = train_data)
-```
-```{r}
+
 # Model 3 (interaction): Coefficients
-kable(
-  tidy(lm.interaction),
-  caption = "Model 3 (`lm.interaction`): Coefficient estimates"
-)
+lm.interaction
 ```
 
 **Model comparison:**
@@ -855,10 +816,10 @@ actual_min <- test_data$delivery_time_min
 ```
 
 
-```{r}
+```{r, fig.width=12, fig.height = 6}
 # Plotting predicted vs. actual delivery time
 
-ggplot(test_data, aes(x = predicted_min, y = actual_min)) +
+p1 <- ggplot(test_data, aes(x = predicted_min, y = actual_min)) +
   geom_point(alpha = 0.3) +
   geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
   labs(
@@ -870,7 +831,7 @@ ggplot(test_data, aes(x = predicted_min, y = actual_min)) +
 
 # Plotting prediction errors on test data
 
-ggplot(test_data, aes(x = predicted_min, y = actual_min)) +
+p2 <- ggplot(test_data, aes(x = predicted_min, y = actual_min)) +
   geom_point(alpha = 0.3) +
   geom_segment(aes(xend = predicted_min, yend = predicted_min), color = "blue", alpha = 0.2) +
   geom_abline(intercept = 0, slope = 1, color = "red") +
@@ -880,6 +841,8 @@ ggplot(test_data, aes(x = predicted_min, y = actual_min)) +
     y = "Actual Delivery Time [min]"
   ) +
   theme_minimal()
+
+p1 + p2
 ```
 
 ```{r}
@@ -924,12 +887,6 @@ In addition, we compute the RMSE for **short deliveries (< 40 minutes)** only:
 \]  
 The model performs **even better** in this range.
 
-### 3.1.5 Additional test: log-transformation?
-ALL: Should i still include this?
-
-
-
-
 
 ## 3.2 Generalized Linear Models
 
@@ -944,9 +901,7 @@ In the initial Poisson model, continuous variables such as `courier_age_years`, 
 The results showed in the model summary indicates that the p-values for `courier_age_years`, `precipitation_mm`, and `vehicle_type_factor` are greater than 0.05, suggesting that they do not contribute significantly to the model. Therefore, they will not be considered in the second round of modeling.
 
 
-```{r, message = FALSE, warning = FALSE}
-suppressPackageStartupMessages(library(tidyverse))
-library(tidyverse)
+```{r, message = FALSE, warning = FALSE, collapse=TRUE}
 # read data
 df_clean <- read.csv("../data/cleaned_data.csv")
 
@@ -967,8 +922,6 @@ poisson.model.test <- glm(
 
 # check model summary
 summary(poisson.model.test)
-
-
 ```
 The second attempt of the Poisson model involves a reduced set of predictors: only `temperature_celsius`, `humidity_percent`, `distance_km`, `traffic_level_factor`, and `weather_category` are included. All remaining predictors show p-values far below 0.05, which indicates all the predictors contribute to the model. 
 
@@ -994,7 +947,7 @@ Overall, the second Poisson model is more parsimonious and performs better based
 \]
 \
  
-```{r}
+```{r, collapse=TRUE}
 # check traffic_level_factor
 table(df_clean$traffic_level_factor, useNA = "always")
 # Refine the Poisson regression by removing unnecessary variables.
@@ -1008,19 +961,26 @@ poisson.model <- glm(
 
 # check model summary
 summary(poisson.model)
-
-# print the regression formula with coefficients
-cat("Log(average_speed_kmph) = ", paste0(
-  round(coef(poisson.model)[1], 3), " + ",
-  paste0(names(coef(poisson.model))[-1], " * ", round(coef(poisson.model)[-1], 3), collapse = " + ")
-))
-
-
 ```
+\[
+\begin{aligned}
+\text{Log(average_speed_kmph)} = 2.627 &- 0.006 \cdot \text{temperature_celsius} \\
+&- 0.002 \cdot \text{humidity_percent} 
++ 0.036 \cdot \text{distance_km} \\
+&+ 0.162 \cdot \text{traffic_level_factorhigh}
++ 0.212 \cdot \text{traffic_level_factorlow} \\
+&+ 0.275 \cdot \text{traffic_level_factormoderate}
+- 0.143 \cdot \text{traffic_level_factorvery high} \\
+&- 0.046 \cdot \text{weather_categoryPoorVisibility}
+- 0.072 \cdot \text{weather_categoryRainy}
+\end{aligned}
+\]
+\
+
 #### 3.2.1.2 Interpretation of coefficients
 Because the Poisson model uses a log-link function, the coefficients are first exponentiated. 
 
-- *Continous Variables*
+- *Continuous Variables*
 
 The variable ´temperature_celsius´ has an exponentiated coefficient of 0.99, which means that for every 1°C increase in temperature, the expected delivery speed decreases by approximately 1%. This suggests that higher temperatures slightly reduce speed, possibly due to fatigue or decreased performance in hot weather.
 
@@ -1081,9 +1041,8 @@ Slight discrepancies appear under "Very High" traffic, where the model tends to 
 
 This comparison validates that the Poisson model reasonably replicates key patterns in the data and supports its use for simulating delivery behavior under varying traffic levels.
 
-```{r}
+```{r, fig.align='center'}
 # simulate some data from this model
-library(ggplot2)
 set.seed(2)
 sim.data.average_speed_kmph.Poisson <- simulate(poisson.model)
 names(sim.data.average_speed_kmph.Poisson) <- "sim_average_speed_kmph"
@@ -1138,7 +1097,7 @@ To check for overdispersion, we calculated the overdispersion statistic using Pe
 
 **Conclusion**
 The residual diagnostics show no major issues with model specification. The model appears to fit the data reasonably well, with no evidence of significant overdispersion or major misspecification.
-```{r}
+```{r, fig.width=12, fig.height = 6}
 
 # residual analysis
 # 1.compute residuals
@@ -1148,7 +1107,7 @@ df_clean$residuals_pearson <- residuals(poisson.model, type = "pearson")  # for 
 df_clean$predicted_speed_kmph <- predict(poisson.model, type = "response") # Compute predicted values
 
 # 2. Plot: Predicted vs. Residuals
-ggplot(df_clean, aes(x = predicted_speed_kmph, y = residuals_deviance)) +
+p1 <- ggplot(df_clean, aes(x = predicted_speed_kmph, y = residuals_deviance)) +
   geom_point(alpha = 0.4, color = "darkorange") +
   geom_hline(yintercept = 0, linetype = "dashed") +
   labs(
@@ -1159,7 +1118,7 @@ ggplot(df_clean, aes(x = predicted_speed_kmph, y = residuals_deviance)) +
   theme_minimal()
 
 # 3. Histogram of Residuals
-ggplot(df_clean, aes(x = residuals_deviance)) +
+p2 <- ggplot(df_clean, aes(x = residuals_deviance)) +
   geom_histogram(bins = 50, fill = "steelblue", color = "black") +
   labs(
     title = "Histogram of Deviance Residuals",
@@ -1168,12 +1127,18 @@ ggplot(df_clean, aes(x = residuals_deviance)) +
   ) +
   theme_minimal()
 
+p1 + p2
+
 # 4. Check for Overdispersion
 overdispersion <- sum(residuals(poisson.model, type = "pearson")^2) / poisson.model$df.residual
 overdispersion  # > 1 suggests overdispersion; if >>1, Poisson may not be appropriate
 
 ```
 ### 3.2.2 Binomial Regression
+
+<br>
+
+#### Preparation
 
 First step is preprocessing the data further for the binomial model. This includes removing the "bicycle" observations from `vehicle_type_factor` as they are too scarce and could negatively impact on model fitting.
 
@@ -1189,7 +1154,7 @@ df_clean_binomial <- df_clean %>%
   filter(vehicle_type_factor != "bicycle")
 ```
 
-Next, the data set is split into 80% training and 20% testing parts.
+Next, the data set is split into 80% training and 20% testing parts.  
 
 ``` {r}
 # Split data into 80% train and 20% test
@@ -1199,9 +1164,13 @@ train_data <- df_clean_binomial[train_indices, ]
 test_data  <- df_clean_binomial[-train_indices, ]
 ```
 
+<br>
+
+#### Modelling
+
 As a first attempt all features are included and no interactions are modeled.
 
-``` {r}
+``` {r, collapse=TRUE}
 # GLM Binomial model (all features)
 binomial.model.test <- glm(
   long_delivery_flag ~ courier_age_years + courier_rating_1_to_5 + 
@@ -1223,10 +1192,9 @@ It turns out that certain classes of `traffic_level_factor` perfectly estimate `
 table(df_clean_binomial$long_delivery_flag, df_clean_binomial$traffic_level_factor)
 ```
 
-<<<<<<< Updated upstream
 This is problematic as it means that the maximum likelihood estimate (MLE) for the coefficients corresponding to the factor levels of `traffic_level_factor` does not exist and the model fails to converge. As a result, the interpretation of coefficients becomes unstable and meaningless. I decided to progress with a more robust solution: Firth’s correction (bias-reduced logistic regression) implemented with the `brglm2::brglmFit` method.
 
-```{r}
+```{r, collapse=TRUE}
 binomial.model.bias.reduced <- glm(
   long_delivery_flag ~ courier_age_years + courier_rating_1_to_5 + 
     temperature_celsius + humidity_percent +
@@ -1241,7 +1209,7 @@ summary(binomial.model.bias.reduced)
 
 This method resolved the data separation issue (low standard errors) and decreased the number of Fisher Scoring iterations from 20 to 7. We can see that all features except `courier_age_years`, `courier_rating_1_to_5` `humidity_percent` and `vehicle_type_factor` have a significant p-value. These features are removed in the final model.
 
-```{r}
+```{r, collapse=TRUE}
 binomial.model.final <- glm(
   long_delivery_flag ~ temperature_celsius +
     distance_km + order_type_factor +
@@ -1255,12 +1223,16 @@ summary(binomial.model.final)
 
 The loss in accuracy of the final model is tested compared to the previous with a Likelihood Ratio Test.
 
-``` {r}
+``` {r, collapse=TRUE}
 #Likelihood Ratio Test
 anova(binomial.model.bias.reduced, binomial.model.final, test="LRT")
 ```
 
 The null hypothesis in this test is that the simpler model (final model) fits the data as well as the more complex model and the alternative hypothesis that the more complex model provides a significantly better fit. As p-value = 0.4806 (>> 0.05), we fail to reject the null hypothesis and can conclude there was no significant loss in model fit when dropping the aforementioned features. The final model is therefore the better option considering it is more simple.
+
+<br>
+
+#### Evaluation
 
 In order to test the accuracy of the model, predictions are made for the `test_data`, a confusion matrix is created and accuracy is measured.
 
@@ -1283,15 +1255,30 @@ mean(test_data$y_pred == test_data$long_delivery_flag)
 
 The accuracy of the model (with threshold = 0.5) is 93.2% which is very good. 54 deliveries that were shorter than 40 minutes were misclassified as longer than and 69 of deliveries that were longer than 40 minutes were misclassified as shorter than. This corresponds to a specificity of 94.9% and sensitivity of 90.7%. Furthermore, when the model predicts a short delivery, it has 93.6% probability of being correct (negative predictive value) and when it predicts a long delivery, it has a 92.6% probability of being correct.
 
-The formula for regression is as follows:
+<br>
 
-``` {r}
-# Print the regression formula with coefficients
-cat("Long_delivery_flag = ", paste0(
-  round(coef(binomial.model.final)[1], 3), " + ",
-  paste0(names(coef(binomial.model.final))[-1], " * ", round(coef(binomial.model.final)[-1], 3), collapse = " + ")
-))
-```
+#### Interpretation
+
+The estimated model,expressed in its exponentiated form, is:
+
+\[
+\begin{aligned}
+\text{long_delivery_flag} = \exp(&\, -16.381 
++ 0.084 \cdot \text{temperature_celsius} \\
+&+ 0.243 \cdot \text{distance_km} 
++ 7.514 \cdot \text{order_type_factorDrinks} \\
+&- 0.719 \cdot \text{order_type_factorMeal}
++ 0.711 \cdot \text{order_type_factorSnack} \\
+&- 1.732 \cdot \text{traffic_level_factorlow}
++ 1.792 \cdot \text{traffic_level_factormoderate} \\
+&+ 10.219 \cdot \text{traffic_level_factorhigh}
++ 16.605 \cdot \text{traffic_level_factorveryhigh} \\
+&+ 0.448 \cdot \text{weather_categoryPoorVisibility}
++ 1.105 \cdot \text{weather_categoryRainy})
+\end{aligned}
+\]
+\
+
 As for the interpretation of these coefficients:
 
 * At reference level: (temperature_celsius = 0, distance_km = 0, order_type_factor = "Buffet", traffic_level_factor = "very low", weather_category = "Clear") the probability of a long delivery is:
@@ -1327,10 +1314,6 @@ P = e^{7.51433} \approx 1,834 \text{ times}
 
 * Similarly for rainy weather instead, the odds increase by approx. 3 times.
 
-
-## 3.3 Generalized Additive Models
-=======
-
 ## 3.3. Generalised Additive Models (GAM) 
 
 After analyzing the linear model and the generalized linear model (GLM), we will now explore a more flexible and potentially more powerful approach: the Generalized Additive Model (GAM). Our goal is to improve the prediction of the target variable — `delivery_time_min`. As before, we will use the `df_clean.csv` dataset, which has been cleaned and preprocessed from the raw data. The `gam()` function is found in the `{mgcv}` package. 
@@ -1345,11 +1328,10 @@ First, all continuous and categorical variables are included in an initial GAM t
 
 The first round of results shows that the adjusted R-squared is 0.858. The statistically significant predictors, marked with '***', include the 'Intercept', 'temperature_celsius', 'humidity_percent', 'distance_km', and 'traffic_level_factor', suggesting they have a meaningful impact on delivery time. In contrast, variables such as 'courier_age_years', 'precipitation_mm', 'vehicle_type_factor', and 'weather_category' have p-values greater than 0.05 and therefore do not significantly contribute to the model. These non-significant variables will be excluded in the next modeling steps. 
 
-```{r, warning=FALSE, message=FALSE}
+```{r, warning=FALSE, message=FALSE, collapse=TRUE}
 # again loading the cleaned data as df_clean
 df_clean <- read.csv("../data/cleaned_data.csv")
-# loading {mgcv} package for the gam() function
-library(mgcv)
+
 # 1st trial gam modeling with all possible variables
 gam.model.test1 <- gam(delivery_time_min ~ courier_age_years + temperature_celsius + humidity_percent 
                        + precipitation_mm + distance_km + traffic_level_factor 
@@ -1367,7 +1349,7 @@ The anova() function was used to compare the two models. This test assesses whet
 
 Lastly, comparing the AIC (Akaike Information Criterion), the value decreased from 58,762 (Model 1) to 57,308 (Model 2). Since lower AIC values indicate a better trade-off between model fit and complexity, this further supports Model 2 as the preferred model.
 
-```{r}
+```{r, collapse=TRUE}
 # 2nd Attempt: Model with Selected Variables and Smooth Terms
 gam.model.test2 <- gam(delivery_time_min ~ s(temperature_celsius, bs = "cs", k=5) + 
                          s(humidity_percent, bs = "cs", k=5) + 
@@ -1381,8 +1363,6 @@ summary(gam.model.test2)
 # model comparing test1 and test2
 anova(gam.model.test1, gam.model.test2, test = "F")
 AIC(gam.model.test1, gam.model.test2)
-
-library(knitr)
 
 # Create data frame
 model_comparison <- data.frame(
@@ -1414,22 +1394,30 @@ Although `gam.model.test6` fits slightly better, the improvement is minimal, and
 
 Therefore, `gam.model.test8` is preferable for its simplicity and comparable performance. It retains the significant interaction and avoids unnecessary terms that may lead to overfitting.
 
-```{r}
+```{r, collapse=TRUE, out.width = "100%", fig.height = 2}
 # 6th fitting, include recommended interations to the GAM with shrinkage of cyclic spline
-gam.model.test6 <- gam(delivery_time_min ~       s(temperature_celsius, bs = "cs", k=5) + 
-                                                 s(humidity_percent, bs = "cs", k=5) + 
-                                                 s(distance_km, bs = "cs", k=5) + 
-                                                 traffic_level_factor + 
-                                                 weather_category +
-                                                 temperature_celsius:humidity_percent +
-                                                 distance_km:traffic_level_factor,
-                                                 data = df_clean)
+gam.model.test6 <- gam(delivery_time_min ~ s(temperature_celsius, bs = "cs", k=5) + 
+                                           s(humidity_percent, bs = "cs", k=5) + 
+                                           s(distance_km, bs = "cs", k=5) + 
+                                           traffic_level_factor + 
+                                           weather_category +
+                                           temperature_celsius:humidity_percent +
+                                           distance_km:traffic_level_factor,
+                                           data = df_clean)
 summary(gam.model.test6)
 #  visualize the smooth terms, Plot all smooth terms with confidence intervals 
-plot(gam.model.test6, pages = 1, se = TRUE, rug = TRUE, main="Smooth Terms of GAM Model Test 6")
+# Set layout to 1 row, 3 columns
+par(mfrow = c(1, 3))
+
+# Plot each smooth term individually
+plot(gam.model.test6, select = 1, se = TRUE, rug = TRUE, main = "Test6: Temp Smooth Term")
+plot(gam.model.test6, select = 2, se = TRUE, rug = TRUE, main = "Test6: Humidity Smooth Term")
+plot(gam.model.test6, select = 3, se = TRUE, rug = TRUE, main = "Test6: Distance Smooth Term")
+
+#plot(gam.model.test6, pages = 1, se = TRUE, rug = TRUE, main="Smooth Terms of GAM Model Test 6")
 
 # 8th continue after 6th, remove insignificant variables
-gam.model.test8 <- gam(delivery_time_min ~       s(temperature_celsius, bs = "cs", k=5) + 
+gam.model.test8 <- gam(delivery_time_min ~ s(temperature_celsius, bs = "cs", k=5) + 
                          s(humidity_percent, bs = "cs", k=5) + 
                          s(distance_km, bs = "cs", k=5) + 
                          traffic_level_factor + 
@@ -1438,7 +1426,13 @@ gam.model.test8 <- gam(delivery_time_min ~       s(temperature_celsius, bs = "cs
                        data = df_clean)
 summary(gam.model.test8)
 #  visualize the smooth terms, Plot all smooth terms with confidence intervals 
-plot(gam.model.test8, pages = 1, se = TRUE, rug = TRUE, main="Smooth Terms of GAM Model Test 8")
+#plot(gam.model.test8, pages = 1, se = TRUE, rug = TRUE, main="Smooth Terms of GAM Model Test 8")
+
+
+# Plot each smooth term individually
+plot(gam.model.test8, select = 1, se = TRUE, rug = TRUE, main = "Test8: Temp Smooth Term")
+plot(gam.model.test8, select = 2, se = TRUE, rug = TRUE, main = "Test8: Humidity Smooth Term")
+plot(gam.model.test8, select = 3, se = TRUE, rug = TRUE, main = "Test8: Distance Smooth Term")
 
 # model comparing test1 and test2
 anova(gam.model.test6, gam.model.test8, test = "F")
@@ -1464,9 +1458,8 @@ The model is fitted using the log-transformed delivery time (log_delivery_time) 
 
 The model achieves a high adjusted R² of 0.886, indicating that 88.6% of the variance in log-transformed delivery time is explained by the model. The GCV score is 0.0255, showing a low level of prediction error, which suggests `gam.model.logtest8` is a robust choice for modeling delivery time.
 
-```{r}
+```{r, collapse=TRUE}
 # Adding log transformed delivery time to d.food_time
-library(tidyverse)
 df_clean <- df_clean %>%
   mutate(log_delivery_time = log(delivery_time_min))
 # 8th continue after 6th, remove insignificant variables
@@ -1498,10 +1491,6 @@ The log-transformed GAM model achieved the lowest RMSE (5.69) and lowest MAE (4.
 Overall, the results suggest that: Applying a log transformation to the target variable can further improve performance, likely due to reducing the influence of outliers and heteroscedasticity. These findings support the use of flexible models such as GAMs, especially when paired with appropriate transformations of the response variable.
 
 ```{r}
-
-library(caret)  # Für createDataPartition
-library(mgcv)  # Für Generalized Additive Models
-library(dplyr)
 #  ---- For linear model test  ----
 set.seed(99)
 train_index <- createDataPartition(df_clean$delivery_time_min, p = 0.8, list = FALSE)
@@ -1581,7 +1570,7 @@ data.frame(
 **visualization**
 
 
-```{r}
+```{r, out.width = "100%", fig.height = 2}
 # Predicted values
 df_clean$pred_lm      <- predict(gam.model.traintest1, newdata = df_clean)
 df_clean$pred_gam     <- predict(gam.model.traintest8, newdata = df_clean)
@@ -1629,6 +1618,12 @@ plot(df_clean$delivery_time_min, df_clean$pred_log_gam,
      pch = 19, col = rgb(0.5, 0, 0.5, 0.3))
 abline(0, 1, col = "red", lwd = 2)
 ```
+
+```{r, include=FALSE}
+# Reset layout
+par(mfrow = c(1, 1))
+```
+
 ## 3.4 Support Vector Machine
 
 In this section, we aim to classify the **traffic level** using SVM models.
@@ -1669,7 +1664,7 @@ We apply a **linear kernel** with a `cost` parameter of 10.
 
 To avoid overfitting, we scale the input variables and use the `e1071::svm()` function. Later, we will compare this model to a radial SVM and explore parameter tuning.
 
-```{r}
+```{r, collapse=TRUE}
 # Train SVM with linear kernel
 svm_model1 <- svm(
   traffic_level_factor ~ distance_km + average_speed_kmph,
@@ -1711,7 +1706,7 @@ To better understand how the SVM model separates traffic levels, we visualize th
 
 We generate a prediction grid and overlay it with the training points to illustrate the model's classification behavior.
 
-```{r}
+```{r, fig.align='center'}
 # Create grid of points across the feature space
 xrange <- seq(min(svm_data$distance_km), max(svm_data$distance_km), length.out = 200)
 yrange <- seq(min(svm_data$average_speed_kmph), max(svm_data$average_speed_kmph), length.out = 200)
@@ -1746,7 +1741,7 @@ We now fit a second model using a **radial basis function (RBF)** kernel. This a
 
 We use the same cost parameter as before (`cost = 10`) and set `gamma = 0.1`. Both variables are scaled.
 
-```{r}
+```{r, collapse=TRUE}
 # Train SVM with radial kernel
 svm_model2 <- svm(
   traffic_level_factor ~ distance_km + average_speed_kmph,
@@ -1779,7 +1774,7 @@ We now plot the decision boundaries of the **radial SVM** using the same feature
 
 This helps us visually assess whether the model better separates overlapping classes.
 
-```{r}
+```{r, fig.align='center'}
 # Create prediction grid (as before)
 xrange <- seq(min(svm_data$distance_km), max(svm_data$distance_km), length.out = 200)
 yrange <- seq(min(svm_data$average_speed_kmph), max(svm_data$average_speed_kmph), length.out = 200)
@@ -1821,7 +1816,7 @@ We use `e1071::tune()` with 10-fold cross-validation to evaluate combinations of
 
 This process helps identify the parameter settings that yield the highest accuracy on the training data.
 
-```{r, cache = TRUE, eval=FALSE}
+```{r, cache = TRUE, eval=FALSE, collapse=TRUE}
 set.seed(123)  # starting point pseudo randomness
 
 # Grid search using cross-validation
