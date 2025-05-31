@@ -1766,16 +1766,44 @@ In summary, the SVM models perform well in classifying traffic levels (>80% accu
 
 # 4. Results and Discussion
 
-Presentation of model performances and comparison.
+Across all modeling approaches, we found that `distance_km` and `traffic_level_factor` were the most important predictors of delivery time, consistently contributing significant effects in linear, generalized linear, and GAM models. Log-transforming the delivery time improved model performance, especially for Generalized Additive Models.
+
+The linear model with interaction already explained a large portion of the variance (R² ~ 88%) and achieved the lowest RMSE (5.59 minutes) on the test set, making it the best-performing model in terms of prediction accuracy for delivery times in this project. The log-transformed GAM model produced comparable results, with a slightly higher R² (0.886) but a slightly higher RMSE (5.69 minutes).
+
+The Poisson regression successfully modeled delivery speeds and provided interpretable coefficients quantifying how traffic and weather affect courier speed. Additionally, the binomial model for classifying long deliveries showed very strong predictive power, achieving over 93% accuracy.
+
+The SVM classifier achieved good accuracy (~84%) in predicting traffic levels based on distance and average speed. However, distinguishing between "moderate" and "high" traffic levels remained challenging.
+
+Overall, our modeling results demonstrate that flexible approaches such as GAMs can provide valuable advantages for this type of data, especially when modeling potential nonlinear relationships and interactions — although, in this case, a well-tuned linear model with interaction terms provided the best predictive performance.
 
 # 5. Conclusion
 
-Interpretation of findings and implications.
+This project showed that machine learning models can effectively predict food delivery times by combining geographic, traffic, weather, and order-related data.
+
+We found that simple, well-designed models — especially linear models with interaction terms — already provide strong predictive performance. Generalized Additive Models (GAMs) added flexibility for modeling nonlinear effects, which could become even more useful in the case that data complexity increases.
+
+Distance and traffic level clearly emerged as being the most important factors influencing delivery time. The Poisson and binomial models also demonstrated how different modeling techniques can answer various business related questions, such as predicting delivery speeds or classifying long deliveries (e.g. to pick suitable packaging).
+
+Furthermore Support Vector Machines performed reasonably well for traffic classification, they were limited by feature overlap.
+
+In practice, models like these could help improve ETA accuracy, support better resource planning, and enhance customer experience. The interesting aspect of this group work was that in real life, we use applications that use ETA predictions (i.e. Uber Eats). It was therefore very interesting to see (in a limited and much easier setting) what is behind the ETA indication of such an app.
+
+Future work could include adding real-time data (e.g. live traffic), looking for more features (e.g. time of the day), or testing more advanced models.
 
 # 6 Chapter on AI 
 
-1- How did we use it? 
+In this project, we used AI tools (specifically ChatGPT) to support code revision and improvement during the development of our analysis.
 
-2- Where did we have to be careful etc. 
+For example we used ChatGPT for the following tasks:
+
+  - Refining code syntax and structure (e.g. improving clarity of ggplot visualizations)
+
+  - Debugging: when certain code chunks produced errors or warnings, we asked ChatGPT to help identify the issue and suggest corrections
+
+  - Improving explanations: we used AI to help rewrite parts of the text (e.g. model interpretation sections) to make them clearer and more consistent
+
+Throughout the project, we always double-checked any code or text we got from AI. We tested all suggestions first before adding them to our final version, and made sure that explanations matched our actual results.
+
+Overall, using AI was very helpful for improving our code and the report, but it was important to review everything carefully and make sure it really fit with what we had done and understood.
 
 # References
