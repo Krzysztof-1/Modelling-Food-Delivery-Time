@@ -91,6 +91,7 @@ library(stringr)
 library(brglm2)
 library(mgcv)
 library(kableExtra)
+library(neuralnet)
 #suppressPackageStartupMessages(library(tidyverse))
 #library(tidyverse)
 
@@ -799,14 +800,14 @@ The results showed in the model summary indicates that the p-values for `courier
 
 
 ```{r, message = FALSE, warning = FALSE, collapse=TRUE}
-# read data
-df_clean <- read.csv("../data/cleaned_data.csv")
-
-
 #  Convert to unordered factor
 df_clean$traffic_level_factor <- factor(df_clean$traffic_level_factor, ordered = FALSE)
 #  Set the reference level
 df_clean$traffic_level_factor <- relevel(df_clean$traffic_level_factor, ref = "very low")
+#  Convert to unordered factor
+df_clean$weather_category <- factor(df_clean$weather_category, ordered = FALSE)
+#  Set the reference level
+df_clean$weather_category <- relevel(df_clean$weather_category, ref = "Clear")
 
 # regression with glm poisson model
 poisson.model.test <- glm(
@@ -906,8 +907,8 @@ coef_table <- data.frame(
 # Display as a kable table
 kable(coef_table, caption = "Poisson Regression Coefficients and IRRs") %>% 
   kable_styling(full_width = F) %>% 
-  column_spec(2, width ="4cm") %>% 
-  column_spec(3, width ="4cm")
+  column_spec(1, width ="4cm") %>% 
+  column_spec(2, width ="4cm")
 
 ```
 
@@ -1044,11 +1045,6 @@ kable(overdisp_table, caption = "Overdispersion Check Result") %>%
 First step is preprocessing the data further for the binomial model. This includes removing the "bicycle" observations from `vehicle_type_factor` as they are too scarce and could negatively impact on model fitting.
 
 ```{r}
-#  Convert to unordered factor
-df_clean$weather_category <- factor(df_clean$weather_category, ordered = FALSE)
-#  Set the reference level
-df_clean$weather_category <- relevel(df_clean$weather_category, ref = "Clear")
-
 # Pre-process vehicle_type_factor
 df_clean_binomial <- df_clean %>%
   # Remove bicycle as only 10 observations
@@ -1230,9 +1226,6 @@ First, all continuous and categorical variables are included in an initial GAM t
 The first round of results shows that the adjusted R-squared is 0.858. The statistically significant predictors, marked with '***', include the 'Intercept', 'temperature_celsius', 'humidity_percent', 'distance_km', and 'traffic_level_factor', suggesting they have a meaningful impact on delivery time. In contrast, variables such as 'courier_age_years', 'precipitation_mm', 'vehicle_type_factor', and 'weather_category' have p-values greater than 0.05 and therefore do not significantly contribute to the model. These non-significant variables will be excluded in the next modeling steps. 
 
 ```{r, warning=FALSE, message=FALSE, collapse=TRUE}
-# again loading the cleaned data as df_clean
-df_clean <- read.csv("../data/cleaned_data.csv")
-
 # 1st trial gam modeling with all possible variables
 gam.model.test1 <- gam(delivery_time_min ~ courier_age_years + temperature_celsius + humidity_percent 
                        + precipitation_mm + distance_km + traffic_level_factor 
@@ -1770,10 +1763,6 @@ The EDA points out not to use the `precipitation_mm` feature. `courier_age_years
 ### Processing
 
 ```{r, neural_network_preprocessing}
-#  Convert to unordered factor
-df_clean$weather_category <- factor(df_clean$weather_category, ordered = FALSE)
-#  Set the reference level
-df_clean$weather_category <- relevel(df_clean$weather_category, ref = "Clear")
 
 # Pre-process vehicle_type_factor
 df_clean_ann <- df_clean %>%
@@ -1796,8 +1785,7 @@ Firstly, the features and target are defined.
 set.seed(42)
 indices <- createDataPartition(df_clean_ann[[target_variable]], p = 0.8, list = FALSE)
 train <- df_clean_ann[indices, ]
-test <- df_clean_ann[-indices, ]
-
+test <- df_clean_ann[c(-indices), ]
 ```
 
 The data set is split into 80% train and 20% test for more accurate evaluation.
@@ -1851,7 +1839,7 @@ As for feature engineering, numerical predictors are min-max scaled to the range
 
 ### Modelling
 
-```{r, cache = TRUE, neural_network_model}
+```{r, neural_network_model}
 set.seed(42)
 delivery_time_model = neuralnet(log_delivery_time ~ temperature_celsius + humidity_percent +
                          distance_km + order_type_factor_Buffet + order_type_factor_Drinks +
@@ -1870,29 +1858,35 @@ The neuralnet package was used to model.
 
 ### Evaluation
 ```{r, neural_network_evaluation, fig.align="center"}
+# Make predictions on test data
 pred_scaled <- compute(delivery_time_model, cbind(test_scaled_numeric, test_encoded_categorical))
-pred_original <- pred_scaled$net.result * (max_target - min_target) + min_target
+
+# Convert to minutes
+pred_original <- exp(pred_scaled$net.result * (max_target - min_target) + min_target)
 
 #Plot predicted vs. actual values
-plot(test[[target_variable]], pred_original, col='blue', pch=16, ylab = "Predicted log delivery time", xlab = "Actual log delivery time")
+plot(test$delivery_time_min, pred_original, col='blue', pch=16, ylab = "Predicted delivery time", xlab = "Actual delivery time")
 abline(0,1)
 
 # RMSE
-kable(sqrt(mean((test[[target_variable]] - pred_original)^2)))
+RMSE = sqrt(mean((test$delivery_time_min - pred_original)^2))
 
 # R-squared calculation
-ss_res <- sum((test[[target_variable]] - pred_original)^2)
-ss_tot <- sum((test[[target_variable]] - mean(test[[target_variable]]))^2)
-r_squared <- 1 - (ss_res / ss_tot)
+ss_res <- sum((test$delivery_time_min - pred_original)^2)
+ss_tot <- sum((test$delivery_time_min - mean(test$delivery_time_min))^2)
+r_squared <- round(1 - (ss_res / ss_tot), 4)
 
-kable(round(r_squared, 4))
+kable(data.frame(RMSE=RMSE, "R Squared" = r_squared), caption = "Neural network RMSE and R squared") %>% 
+  kable_styling(full_width = F) %>% 
+  column_spec(1, width ="4cm") %>% 
+  column_spec(2, width ="4cm")
 ```
 
-* The model has an RMSE of around 0.11 which translates to approx. 1-2 minutes.
+* The model has an RMSE of approx. 5.4.
 
-* R squared is approx. 94% which is very good.
+* R squared is approx. 90% which is very good. This shows the features explain almost all the variance in the data.
 
-* The chart shows that predicted values have a strong relationship with actual values.
+* The chart shows that predicted values have a strong relationship with actual values. The model is a little biased for high values and tends to underestimate the predictions.
 
 <br>
 
