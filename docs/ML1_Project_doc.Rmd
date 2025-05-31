@@ -1877,7 +1877,7 @@ plot(test[[target_variable]], pred_original, col='blue', pch=16, ylab = "Predict
 abline(0,1)
 
 # RMSE
-sqrt(mean((test[[target_variable]] - pred_original)^2))
+kable(sqrt(mean((test[[target_variable]] - pred_original)^2)))
 
 # R-squared calculation
 ss_res <- sum((test[[target_variable]] - pred_original)^2)
