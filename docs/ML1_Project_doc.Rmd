@@ -240,6 +240,7 @@ df_clean <- df.food_time.clean %>%
     # Clean traffic level
     traffic_level_cleaned = str_trim(tolower(traffic_level)),
     traffic_level_factor = factor(traffic_level_cleaned),
+    traffic_level_factor = relevel(traffic_level_factor, ref = "very low"),
 
     # Clean weather description
     weather_description_cleaned = str_trim(tolower(weather_description)),
@@ -248,7 +249,8 @@ df_clean <- df.food_time.clean %>%
       weather_description_cleaned %in% c("fog", "haze", "smoke") ~ "Poor Visibility",
       weather_description_cleaned %in% c("mist", "moderate rain", "light rain") ~ "Rainy",
       TRUE ~ NA_character_
-    ), levels = c("Clear", "Poor Visibility", "Rainy"), ordered = TRUE),
+    ), levels = c("Clear", "Poor Visibility", "Rainy"), ordered = FALSE),
+    weather_category = relevel(weather_category, ref = "clear"),
 
     # Flag for long delivery time
     long_delivery_flag = if_else(delivery_time_min >= 40, 1, 0),
@@ -256,6 +258,7 @@ df_clean <- df.food_time.clean %>%
     # Calculate average speed in km/h
     average_speed_kmph = as.integer(if_else(delivery_time_min > 0, distance_km * 60 / delivery_time_min, NA_real_))
   ) %>%
+  select(-order_type, -vehicle_type, -weather_description, -traffic_level,-traffic_level_cleaned, -weather_description_cleaned) %>% 
   drop_na()
 ```
 
@@ -267,7 +270,7 @@ dim(df_clean)
 
 # View the cleaned dataset
 head(df_clean)
-write.csv(df_clean, "../data/cleaned_data.csv", row.names = FALSE)
+#write.csv(df_clean, "../data/cleaned_data.csv", row.names = FALSE)
 ```
 
 ### 2.2.3 Exploratory Data Analysis
@@ -937,7 +940,7 @@ The results showed in the model summary indicates that the p-values for `courier
 
 ```{r, message = FALSE, warning = FALSE, collapse=TRUE}
 # read data
-df_clean <- read.csv("../data/cleaned_data.csv")
+#df_clean <- read.csv("../data/cleaned_data.csv")
 
 
 #  Convert to unordered factor
@@ -1017,8 +1020,9 @@ For the ´weather_category´, ´weather_categoryClear´ was taken as the baselin
 ´weather_categoryPoor Visibility´ results exponentialed coefficient 0.96, indicating about 4% decrease in speed. ´weather_categoryRainy´ with exponentialed coefficient 0.93, suggesting 7% decrease comparing to the baseline. These results quantitatively describe how adverse weather conditions reduce delivery speed, with rain having a slightly greater negative effect than poor visibility.
 
 
+
 ```{r}
-#library(kableExtra)
+
 # Extract variables of interest
 vars <- c("traffic_level_factorhigh", 
           "traffic_level_factorlow", 
@@ -1122,6 +1126,7 @@ To check for overdispersion, we calculated the overdispersion statistic using Pe
 
 **Conclusion**
 The residual diagnostics show no major issues with model specification. The model appears to fit the data reasonably well, with no evidence of significant overdispersion or major misspecification.
+
 ```{r, fig.width=12, fig.height = 6}
 
 # residual analysis
@@ -1368,7 +1373,7 @@ The first round of results shows that the adjusted R-squared is 0.858. The stati
 
 ```{r, warning=FALSE, message=FALSE, collapse=TRUE}
 # again loading the cleaned data as df_clean
-df_clean <- read.csv("../data/cleaned_data.csv")
+#df_clean <- read.csv("../data/cleaned_data.csv")
 
 # 1st trial gam modeling with all possible variables
 gam.model.test1 <- gam(delivery_time_min ~ courier_age_years + temperature_celsius + humidity_percent 
@@ -1431,13 +1436,6 @@ model_comparison <- data.frame(
 
 # Print the table
 kable(model_comparison, digits = 2, align = 'c', caption = "Model Comparison: gam.model.test1 vs gam.model.test2")
-```
-```{r}
-# Convert to data frame
-anova_df <- as.data.frame(anova_results)
-
-# Check column names
-colnames(anova_df)
 ```
 
 
@@ -1543,11 +1541,11 @@ summary(gam.model.logtest8)
 
 To evaluate the performance of different modeling approaches for predicting delivery time, three models were compared using RMSE (Root Mean Squared Error) and MAE (Mean Absolute Error) on a held-out test set:
 
--- Linear Model (`gam.model.test1`) – A simple GAM without smoothing terms, treating all predictors as linear.
+- GAM without smoothing terms (`gam.model.test1`) – A simple GAM without smoothing terms, treating all predictors as linear, which is equal to a linear model.
 
--- GAM on Original Scale (`gam.model.test8`) – A flexible GAM using cubic regression splines (bs = "cs") for numeric predictors and including an interaction between temperature and humidity.
+- GAM on Original Scale (`gam.model.test8`) – A flexible GAM using cubic regression splines (bs = "cs") for numeric predictors and including an interaction between temperature and humidity.
 
--- GAM with Log-Transformed Target (`gam.model.logtest8`) – Same as test8, but applied to a log-transformed delivery time to account for potential skewness and stabilize variance.
+- GAM with Log-Transformed Target (`gam.model.logtest8`) – Same as test8, but applied to a log-transformed delivery time to account for potential skewness and stabilize variance.
 
 The results show:
 
@@ -1623,13 +1621,16 @@ MAE_logtest8 <- mean(abs(pred_logtest8_back - test_data$delivery_time_min))
 
 
 # ---- Model Comparison Table ----
-data.frame(
-  Model = c("Linear model (test 1)", "Original Scale (test8)", "Log-Transformed (logtest8)"),
+model_comparison <- data.frame(
+  Model = c("GAM without smoothing terms (test 1)", "GAM on Original Scale (test8)", "GAM with Log-Transformed Target (logtest8)"),
   RMSE = c(RMSE_test1, RMSE_test8, RMSE_logtest8),
   MAE = c(MAE_test1, MAE_test8, MAE_logtest8)
 )
 
-
+# Display the table using kableExtra
+model_comparison %>%
+  kbl(caption = "Model Comparison Table", digits = 3, align = "lcc") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
 ```
 
 **visualization**
