@@ -20,3 +20,6 @@ readr
 purrr
 forcats
 lubridate
+brglm2
+nlme
+mgcv
