@@ -16,19 +16,53 @@ knitr:
 
 # 1. Introduction
 
-Brief introduction to the project, objectives, and relevance.
+In recent years, the rapid expansion of online food delivery services has transformed the way consumers access meals, especially in densely populated urban areas. Ensuring timely delivery is essential not only for customer satisfaction but also for maintaining competitive advantage in a highly saturated market. However, predicting food delivery times is inherently complex, influenced by factors ranging from geographic location and traffic patterns to weather conditions and courier characteristics. This project leverages data-driven methods to address this challenge by modeling delivery duration using a range of machine learning techniques.
+
+The primary objective of this project is to build predictive models that accurately estimate food delivery times based on a rich set of features describing the delivery context. Specifically, we aim to:
+
+- Apply multiple machine learning models to predict delivery time.
+
+- Evaluate model performance using appropriate metrics.
+
+- Interpret feature importance to understand the key drivers of delivery speed.
+
+Accurate delivery time predictions can significantly enhance operational efficiency for food delivery platforms. From optimizing route planning to improving user experience through reliable ETAs, these models have practical implications for both logistics teams and end customers. Moreover, the insights gained from the modeling process can inform strategic decisions such as resource allocation, staffing during peak hours, and pricing policies.
 
 # 2. Data Description
 
 ## 2.1 Data Source
+The dataset used in this project originates from a real-world scenario involving food delivery logistics. It is publicly available on Kaggle @gibin2023food. This dataset captures a diverse and comprehensive set of variables related to food delivery orders, making it an ideal candidate for exploring machine learning approaches to predict delivery times.
 
-1- What is it about 
+**Dataset Overview**
+The dataset contains 10,001 delivery records, each representing a unique food delivery transaction. These records encompass various dimensions of the delivery process, including geographic information, courier characteristics, weather and traffic conditions, and order-specific features. The data schema is outlined as follows:
 
-2- Where is it from 
+- ID: A unique identifier for each delivery instance.
 
-3- What columns are in there 
+- Delivery_person_ID: Unique ID for the delivery person, with a city code prefix (e.g., "DEL" for Delhi).
 
-4- Data Preprocessing 
+- Delivery_person_Age: Age of the delivery person in years.
+
+- Delivery_person_Ratings: Customer-provided rating of the delivery person (typically on a 5-point scale).
+
+- Restaurant_latitude / Restaurant_longitude: GPS coordinates of the restaurant.
+
+- Delivery_location_latitude / Delivery_location_longitude: GPS coordinates of the customer delivery address.
+
+- Type_of_order: Categorical variable describing the type of food (e.g., meal, snacks, drinks, buffet).
+
+- Type_of_vehicle: Type of vehicle used for delivery (e.g., scooter, motorcycle, cycle, electric scooter).
+
+- Temperature: Ambient temperature at the time of delivery (°C).
+
+- Humidity: Relative humidity (%) during delivery.
+
+- Weather_description: Textual description of weather (e.g., "sunny", "cloudy", "stormy").
+
+- Traffic_Level: Categorical description of traffic congestion (e.g., "very low", "low", "moderate", "high", "very high").
+
+- Distance (km): Computed distance between restaurant and delivery location in kilometers.
+
+- TARGET: Delivery time in minutes (target variable for prediction).
 
 ## 2.2 Data Cleaning and Exploratory Data Analysis
 
@@ -53,6 +87,7 @@ library(tidyr)
 library(stringr)
 library(brglm2)
 library(mgcv)
+library(kableExtra)
 #suppressPackageStartupMessages(library(tidyverse))
 #library(tidyverse)
 
@@ -88,15 +123,15 @@ df.food_time <- df.food_time %>%
 ### 2.2.1 Geographic Filtering
 To gain an initial understanding of the data set, we begin by examining the geographical distribution of the delivery observations. Four columns provide relevant location information:
 
-`restaurant_longitude_deg`, `Restaurant_longitude`, `Delivery_location_latitude`, `Delivery_location_longitude`. All delivery distances are under 50 km.
+`restaurant_longitude_deg`, `Restaurant_longitude`, `Delivery_location_latitude`, `Delivery_location_longitude`. All delivery distances are under 80 km.
 
-Figures 1 and 2 show histograms of the restaurants' latitude and longitude. The values span a broad range: latitudes from -30 to 30 and longitudes from -80 to 80. However, the distribution is uneven, with most data points concentrated at latitudes greater than 0 and longitudes greater than 60.
+An analysis of the restaurants’ latitude and longitude values revealed a wide range: latitudes from -30 to 30 and longitudes from -80 to 80. However, the distribution is uneven, with most data points concentrated at latitudes greater than 0 and longitudes greater than 60.
 
 To narrow the data set to the relevant geographic area, we applied a filter to retain only observations with latitude ≥ 0 and longitude ≥ 60. This refinement reduced the data set from 10,001 to 9,084 entries, all located within a single country—India.
 
-To visualize the geographic distribution of these observations, we first defined the map boundaries using the data set’s minimum and maximum latitude and longitude values. These coordinates were converted into a simple feature object representing the corners of the bounding box. This object was then used to download map tiles corresponding to the area of interest, enabling accurate spatial visualization (Figure 3).
+To visualize the geographic distribution of these observations, we first defined the map boundaries using the data set’s minimum and maximum latitude and longitude values. These coordinates were converted into a simple feature object representing the corners of the bounding box. This object was then used to download map tiles corresponding to the area of interest, enabling accurate spatial visualization.
 
-Figure 4 displays all restaurant and delivery locations overlaid on the background map from Figure 3. The plotted points indicate that the observations were collected from 22 cities across India, including major urban centers such as New Delhi, Mumbai, Bangalore, Kolkata, and Chennai.
+Figure 1 displays all restaurant and delivery locations overlaid on the background map defined by bounding box. The plotted points indicate that the observations were collected from 22 cities across India, including major urban centers such as New Delhi, Mumbai, Bangalore, Kolkata, and Chennai.
 
 
 ```{r geographic_filtering, fig.height=4, fig.align='center', warning=FALSE, message=FALSE, exec = FALSE}
@@ -127,7 +162,7 @@ example.map <- get_tiles(bbox.sf, provider = "OpenStreetMap")
 # Extract bounding box limits
 bbox.limits <- st_bbox(bbox.sf)
 
-# Figure 4: Plot restaurant and delivery locations on the map
+# Figure 1: Plot restaurant and delivery locations on the map
 ggplot() +
   layer_spatial(data = example.map) +
   geom_point(data = df.food_time.clean,
@@ -504,7 +539,6 @@ This includes:
 - Generalized Additive Model
 - Support Vector Machine
 - Artificial neural network
-
 
 
 ## 3.1 Linear Model
@@ -931,22 +965,7 @@ Additionally, the ´residual deviance´ slightly increases from 7492.1 to 7497.7
 
 Overall, the second Poisson model is more parsimonious and performs better based on the AIC value. The estimated model,expressed in its exponentiated form, is:
  
-\[
-\begin{aligned}
-\text{average_speed_kmph} = \exp(&\, 2.627 
-- 0.006 \cdot \text{temperature_celsius} \\
-&- 0.002 \cdot \text{humidity_percent} 
-+ 0.036 \cdot \text{distance_km} \\
-&+ 0.162 \cdot \text{traffic_level_factorhigh}
-+ 0.212 \cdot \text{traffic_level_factorlow} \\
-&+ 0.275 \cdot \text{traffic_level_factormoderate}
-- 0.143 \cdot \text{traffic_level_factorvery high} \\
-&- 0.046 \cdot \text{weather_categoryPoorVisibility}
-- 0.072 \cdot \text{weather_categoryRainy})
-\end{aligned}
-\]
-\
- 
+
 ```{r, collapse=TRUE}
 # check traffic_level_factor
 table(df_clean$traffic_level_factor, useNA = "always")
@@ -978,8 +997,7 @@ summary(poisson.model)
 \
 
 #### 3.2.1.2 Interpretation of coefficients
-Because the Poisson model uses a log-link function, the coefficients are first exponentiated. 
-
+Because the Poisson model uses a log-link function, the coefficients are interpreted in terms of their Incidence Rate Ratios (IRRs). The IRR is the exponentiated coefficient from the Poisson regression
 - *Continuous Variables*
 
 The variable ´temperature_celsius´ has an exponentiated coefficient of 0.99, which means that for every 1°C increase in temperature, the expected delivery speed decreases by approximately 1%. This suggests that higher temperatures slightly reduce speed, possibly due to fatigue or decreased performance in hot weather.
@@ -1000,29 +1018,36 @@ For the ´weather_category´, ´weather_categoryClear´ was taken as the baselin
 
 
 ```{r}
-#++++++++++++++++++++++++++++++++++++++++++  
+#library(kableExtra)
+# Extract variables of interest
+vars <- c("traffic_level_factorhigh", 
+          "traffic_level_factorlow", 
+          "traffic_level_factormoderate", 
+          "traffic_level_factorvery high",
+          "weather_categoryPoor Visibility", 
+          "weather_categoryRainy",
+          "temperature_celsius", 
+          "humidity_percent",
+          "distance_km")
 
-names(coef(poisson.model))
+# Get coefficients and IRRs
+coefs <- coef(poisson.model)[vars]
+irr <- exp(coefs)
 
-#coefficients of the poisson Mode
-# first on traffic_level_factor
-coef(poisson.model)[c("traffic_level_factorhigh", 
-                      "traffic_level_factorlow", 
-                      "traffic_level_factormoderate", 
-                      "traffic_level_factorvery high")]
+# Create data frame
+coef_table <- data.frame(
+  Coefficient = round(coefs, 3),
+  IRR = round(irr, 2)
+)
 
-exp(coef(poisson.model)[c("traffic_level_factorhigh", 
-                          "traffic_level_factorlow", 
-                          "traffic_level_factormoderate", 
-                          "traffic_level_factorvery high")]) %>% round(digits = 2)
+# Display as a kable table
+kable(coef_table, caption = "Poisson Regression Coefficients and IRRs") %>% 
+  kable_styling(full_width = F) %>% 
+  column_spec(2, width ="4cm") %>% 
+  column_spec(3, width ="4cm")
 
-# then on weather_category
-coef(poisson.model)[c("weather_categoryPoor Visibility", "weather_categoryRainy")]
-exp(coef(poisson.model)[c("weather_categoryPoor Visibility", "weather_categoryRainy")]) %>% round(digits = 2)
-# check for continuous variables
-coef(poisson.model)[c("temperature_celsius", "humidity_percent","distance_km")]
-exp(coef(poisson.model)[c("temperature_celsius", "humidity_percent","distance_km")]) %>% round(digits = 2)
 ```
+
 
 
 #### 3.2.1.3 Comparison of Real vs. Simulated Delivery Speeds by Traffic Level
@@ -1131,8 +1156,21 @@ p1 + p2
 
 # 4. Check for Overdispersion
 overdispersion <- sum(residuals(poisson.model, type = "pearson")^2) / poisson.model$df.residual
-overdispersion  # > 1 suggests overdispersion; if >>1, Poisson may not be appropriate
+# Create a summary table
+overdisp_table <- data.frame(
+  Metric = "Overdispersion",
+  Value = round(overdispersion, 3),
+  Interpretation = if (overdispersion > 1) {
+    "Overdispersion detected (> 1); consider using quasi-Poisson or negative binomial."
+  } else {
+    "No overdispersion (< 1); Poisson model is likely appropriate."
+  }
+)
 
+# Print as a styled table
+kable(overdisp_table, caption = "Overdispersion Check Result") %>%
+  kable_styling(full_width = FALSE, position = "left") %>%
+  column_spec(1, bold = TRUE)
 ```
 ### 3.2.2 Binomial Regression
 
@@ -1339,7 +1377,7 @@ gam.model.test1 <- gam(delivery_time_min ~ courier_age_years + temperature_celsi
           data = df_clean)
 summary(gam.model.test1)
 ```
-**Gam model 2, integrate smoother**
+**Gam model 2, integrate smoother and interactions**
 
 In the second attempt, we include only the statistically significant variables identified previously. Additionally, we apply the `s()` function to all continuous variables — `temperature_celsius`, `humidity_percent`, and `distance_km` — to allow for flexible, non-linear relationships using smooth terms. To avoid overfitting, we use `bs = "cs"` (cubic regression splines with shrinkage), and set `k = 5` to limit the maximum allowable complexity for each smooth term.
 
@@ -1360,14 +1398,33 @@ gam.model.test2 <- gam(delivery_time_min ~ s(temperature_celsius, bs = "cs", k=5
 # print the summary
 summary(gam.model.test2)
 
-# model comparing test1 and test2
-anova(gam.model.test1, gam.model.test2, test = "F")
-AIC(gam.model.test1, gam.model.test2)
+# Run the anova model comparison
+anova_results <- anova(gam.model.test1, gam.model.test2, test = "F")
+
+# Create a data frame from the ANOVA results
+anova_table <- data.frame(
+  Model = c("gam.model.test1", "gam.model.test2"),
+  Resid_Df = anova_df[["Resid. Df"]],
+  Resid_Dev = round(anova_df[["Resid. Dev"]], 2),
+  Df = c(NA, round(anova_df[["Df"]][2], 2)),
+  Deviance = c(NA, round(anova_df[["Deviance"]][2], 2)),
+  F = c(NA, round(anova_df[["F"]][2], 1)),
+  Pr_F = c(NA, format.pval(anova_df[["Pr(>F)"]][2], digits = 2))
+)
+
+# Print the ANOVA results table using kable
+knitr::kable(anova_table, digits = 2, align = 'c', caption = "ANOVA Comparison Between gam.model.test1 and gam.model.test2")
+
+# run AIC comparing test1 and test2
+
+aic_results <- AIC(gam.model.test1, gam.model.test2)
 
 # Create data frame
 model_comparison <- data.frame(
   MODEL = c("gam.model.test1", "gam.model.test2"),
-  AIC = c(58762.26, 57307.94),
+  Degrees_of_Freedom = c(16.00, 19.76),
+  AIC = round(aic_results$AIC, 2),
+  #AIC = c(58762.26, 57307.94),
   GCV = c(39.086, 33.274),
   R2 = c(0.858, 0.879)
 )
@@ -1375,6 +1432,14 @@ model_comparison <- data.frame(
 # Print the table
 kable(model_comparison, digits = 2, align = 'c', caption = "Model Comparison: gam.model.test1 vs gam.model.test2")
 ```
+```{r}
+# Convert to data frame
+anova_df <- as.data.frame(anova_results)
+
+# Check column names
+colnames(anova_df)
+```
+
 
 **Gam model 3, integrate interactions**
 
