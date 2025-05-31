@@ -1933,6 +1933,145 @@ In summary, the SVM models – particularly with the radial kernel – perform w
 
 ## 3.5 Neural Network
 
+In this chapter a simple neural network is used to predict `log_delivery_time`.
+
+The EDA points out not to use the `precipitation_mm` feature. `courier_age_years` and `courier_rating_1_to_5` are also not used as they are deemed to have poor predictive power on the delivery time. The features used in the model are: `temperature_celsius`, `humidity_percent`, `distance_km`, `order_type_factor`, `vehicle_type_factor`, `traffic_level_factor` and `weather_category`.
+
+### Processing
+
+```{r}
+#  Convert to unordered factor
+df_clean$weather_category <- factor(df_clean$weather_category, ordered = FALSE)
+#  Set the reference level
+df_clean$weather_category <- relevel(df_clean$weather_category, ref = "Clear")
+
+# Pre-process vehicle_type_factor
+df_clean_ann <- df_clean %>%
+  # Remove bicycle as only 10 observations
+  filter(vehicle_type_factor != "bicycle") %>%
+  mutate(vehicle_type_factor = factor(vehicle_type_factor))
+
+# Define predictors
+numeric_predictors <- c("temperature_celsius", "humidity_percent", "distance_km")
+categorical_predictors <- c("order_type_factor", "vehicle_type_factor",
+                            "traffic_level_factor", "weather_category")
+
+target_variable <- "log_delivery_time"
+```
+
+Firstly, the features and target are defined.
+
+```{r}
+# Split data into train and test sets
+set.seed(42)
+indices <- createDataPartition(df_clean_ann[[target_variable]], p = 0.8, list = FALSE)
+train <- df_clean_ann[indices, ]
+test <- df_clean_ann[-indices, ]
+```
+
+The data set is split into 80% train and 20% test for more accurate evaluation.
+
+```{r}
+# Min-Max scale train set numeric predictors
+min_vals <- sapply(train[numeric_predictors], min)
+max_vals <- sapply(train[numeric_predictors], max)
+train_scaled_numeric <- as.data.frame(
+  mapply(function(x, minv, maxv) (x - minv) / (maxv - minv),
+         train[numeric_predictors], min_vals, max_vals)
+)
+
+# Use the same scaling for test set (based on train min/max)
+test_scaled_numeric <- as.data.frame(
+  mapply(function(x, minv, maxv) (x - minv) / (maxv - minv),
+         test[numeric_predictors], min_vals, max_vals)
+)
+
+# Scale target feature
+min_target <- sapply(train[target_variable], min)
+max_target <- sapply(train[target_variable], max)
+train_target_scaled <- as.data.frame(
+  mapply(function(x, minv, maxv) (x - minv) / (maxv - minv),
+         train[target_variable], min_target, max_target)
+)
+
+# Define formula for one-hot encoding
+dummy_formula <- as.formula(paste("~", paste(categorical_predictors, collapse = " + ")))
+
+# Fit encoder on training data
+dummies_model <- dummyVars(dummy_formula, data = train)
+
+# Apply to train and test
+train_encoded_categorical <- predict(dummies_model, newdata = train)
+test_encoded_categorical  <- predict(dummies_model, newdata = test)
+
+# Rename column names to remove "." which confuses neuralnet
+clean_names <- function(x) {
+  gsub("[^[:alnum:]_]", "_", x)  # Replace all non-alphanumeric chars with underscore
+}
+colnames(train_encoded_categorical) <- clean_names(colnames(train_encoded_categorical))
+colnames(test_encoded_categorical)  <- clean_names(colnames(test_encoded_categorical))
+
+# Combine new predictors and target
+processed_data <- cbind(train_scaled_numeric, train_encoded_categorical, train_target_scaled)
+```
+As for feature engineering, numerical predictors are min-max scaled to the range of [0,1] while the categorical features are one-hot encoded. The scaling is done as the features have different ranges and this could negatively impact on model convergence.
+
+<br>
+
+### Modelling
+
+```{r}
+set.seed(42)
+delivery_time_model = neuralnet(log_delivery_time ~ temperature_celsius + humidity_percent +
+                         distance_km + order_type_factor_Buffet + order_type_factor_Drinks +
+                         order_type_factor_Meal + order_type_factor_Snack +
+                         vehicle_type_factor_electric_scooter + vehicle_type_factor_motorcycle + 
+                         vehicle_type_factor_scooter + traffic_level_factor_very_low + 
+                         traffic_level_factor_low + traffic_level_factor_moderate + 
+                         traffic_level_factor_high + traffic_level_factor_very_high + 
+                         weather_category_Clear + weather_category_Poor_Visibility + 
+                         weather_category_Rainy,
+                       data = processed_data, hidden = 3 , linear.output = TRUE)
+```
+The neuralnet package was used to model.
+
+<br>
+
+### Evaluation
+```{r, fig.align="center"}
+pred_scaled <- compute(delivery_time_model, cbind(test_scaled_numeric, test_encoded_categorical))
+pred_original <- pred_scaled$net.result * (max_target - min_target) + min_target
+
+#Plot predicted vs. actual values
+plot(test[[target_variable]], pred_original, col='blue', pch=16, ylab = "Predicted log delivery time", xlab = "Actual log delivery time")
+abline(0,1)
+
+# RMSE
+sqrt(mean((test[[target_variable]] - pred_original)^2))
+
+# R-squared calculation
+ss_res <- sum((test[[target_variable]] - pred_original)^2)
+ss_tot <- sum((test[[target_variable]] - mean(test[[target_variable]]))^2)
+r_squared <- 1 - (ss_res / ss_tot)
+
+kable(round(r_squared, 4))
+```
+
+* The model has an RMSE of around 0.11 which translates to approx. 1-2 minutes.
+
+* R squared is approx. 94% which is very good.
+
+* The chart shows that predicted values have a strong relationship with actual values.
+
+<br>
+
+### Interpretation
+```{r, fig.align="center"}
+plot(delivery_time_model)
+```
+
+In summary, the model performs very well in predicting the log delivery time. As it takes approx. 20 minutes to fit, cross validation and network architecture tuning were not carried out.
+
 
 # 4. Results and Discussion
 
