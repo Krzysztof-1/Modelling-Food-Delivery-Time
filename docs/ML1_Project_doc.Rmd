@@ -1769,7 +1769,7 @@ The EDA points out not to use the `precipitation_mm` feature. `courier_age_years
 
 ### Processing
 
-```{r}
+```{r, neural_network_preprocessing}
 #  Convert to unordered factor
 df_clean$weather_category <- factor(df_clean$weather_category, ordered = FALSE)
 #  Set the reference level
@@ -1791,7 +1791,7 @@ target_variable <- "log_delivery_time"
 
 Firstly, the features and target are defined.
 
-```{r}
+```{r, neural_network_split_data}
 # Split data into train and test sets
 set.seed(42)
 indices <- createDataPartition(df_clean_ann[[target_variable]], p = 0.8, list = FALSE)
@@ -1801,7 +1801,7 @@ test <- df_clean_ann[-indices, ]
 
 The data set is split into 80% train and 20% test for more accurate evaluation.
 
-```{r}
+```{r, neural_network_scale_data}
 # Min-Max scale train set numeric predictors
 min_vals <- sapply(train[numeric_predictors], min)
 max_vals <- sapply(train[numeric_predictors], max)
@@ -1850,7 +1850,7 @@ As for feature engineering, numerical predictors are min-max scaled to the range
 
 ### Modelling
 
-```{r}
+```{r, neural_network_model}
 set.seed(42)
 delivery_time_model = neuralnet(log_delivery_time ~ temperature_celsius + humidity_percent +
                          distance_km + order_type_factor_Buffet + order_type_factor_Drinks +
@@ -1868,7 +1868,7 @@ The neuralnet package was used to model.
 <br>
 
 ### Evaluation
-```{r, fig.align="center"}
+```{r, neural_network_evaluation, fig.align="center"}
 pred_scaled <- compute(delivery_time_model, cbind(test_scaled_numeric, test_encoded_categorical))
 pred_original <- pred_scaled$net.result * (max_target - min_target) + min_target
 
@@ -1896,11 +1896,11 @@ kable(round(r_squared, 4))
 <br>
 
 ### Interpretation
-```{r, fig.align="center"}
+```{r, neural_network_interpretation, fig.align="center"}
 plot(delivery_time_model)
 ```
 
-In summary, the model performs very well in predicting the log delivery time. As it takes approx. 20 minutes to fit, cross validation and network architecture tuning were not carried out.
+As visible in the diagram above, the architecture of the model has 3 nodes in the hidden layer. In summary, the model performs very well in predicting the log delivery time. As it takes approx. 20 minutes to fit, cross validation and network architecture tuning were not carried out.
 
 
 # 4. Results and Discussion
