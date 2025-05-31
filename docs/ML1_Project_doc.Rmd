@@ -549,7 +549,7 @@ train_data <- df_clean[train_indices, ]
 test_data  <- df_clean[-train_indices, ]
 ```
 
-### 3.1.1 First Linear model - no interaction
+### 3.1.1 First Linear model
 
 We begin by fitting a first linear model including all variables that appeared relevant based on insights from the EDA.
 
@@ -639,7 +639,7 @@ Additionally, the Q-Q plot indicates that residuals are approximately normally d
 In conclusion, we do not observe any severe violations of linear model assumptions. Therefore, we proceed with the current model and consider variable selection next.
 
 
-### 3.1.2 Second Linear Model – simplification of model 1
+### 3.1.2 Second Linear Model
 
 To assess the impact of individual variables, we use the `drop1()` function. This allows us to test the effect of removing each predictor while keeping the others constant.
 
@@ -676,7 +676,7 @@ AIC(lm.delivery2)
 Finally, the AIC values of both models are nearly identical, again supporting the simplification. We conclude, that the model can be reduced without losing explanatory information by removing `courier_rating_1_to_5`.
 
 
-### 3.1.3 Third Linear Model – including interaction
+### 3.1.3 Third Linear Model – incl. interaction
 
 In the next step, we explore whether an interaction exists between `distance_km` and `traffic_level_factor`. We chose to do so, because the effect of distance on delivery time may be different / stronger under heavy traffic conditions. For example, slow progress over a long distance could lead to a much longer delivery times.
 
@@ -1797,6 +1797,7 @@ set.seed(42)
 indices <- createDataPartition(df_clean_ann[[target_variable]], p = 0.8, list = FALSE)
 train <- df_clean_ann[indices, ]
 test <- df_clean_ann[-indices, ]
+
 ```
 
 The data set is split into 80% train and 20% test for more accurate evaluation.
@@ -1850,7 +1851,7 @@ As for feature engineering, numerical predictors are min-max scaled to the range
 
 ### Modelling
 
-```{r, neural_network_model}
+```{r, cache = TRUE, neural_network_model}
 set.seed(42)
 delivery_time_model = neuralnet(log_delivery_time ~ temperature_celsius + humidity_percent +
                          distance_km + order_type_factor_Buffet + order_type_factor_Drinks +
