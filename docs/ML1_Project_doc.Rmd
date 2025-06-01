@@ -6,6 +6,9 @@ bibliography: references.bib
 csl: apa.csl
 output: 
     html_document:
+      toc: true
+      toc_float: true
+      toc_depth: 3
       code_folding: hide
     df_print: paged
 knitr: 
@@ -36,33 +39,33 @@ The dataset used in this project originates from a real-world scenario involving
 **Dataset Overview**
 The dataset contains 10,001 delivery records, each representing a unique food delivery transaction. These records encompass various dimensions of the delivery process, including geographic information, courier characteristics, weather and traffic conditions, and order-specific features. The data schema is outlined as follows:
 
-- ID: A unique identifier for each delivery instance.
+- **ID**: A unique identifier for each delivery instance.
 
-- Delivery_person_ID: Unique ID for the delivery person, with a city code prefix (e.g., "DEL" for Delhi).
+- **Delivery_person_ID**: Unique ID for the delivery person, with a city code prefix (e.g., "DEL" for Delhi).
 
-- Delivery_person_Age: Age of the delivery person in years.
+- **Delivery_person_Age**: Age of the delivery person in years.
 
-- Delivery_person_Ratings: Customer-provided rating of the delivery person (typically on a 5-point scale).
+- **Delivery_person_Ratings**: Customer-provided rating of the delivery person (typically on a 5-point scale).
 
-- Restaurant_latitude / Restaurant_longitude: GPS coordinates of the restaurant.
+- **Restaurant_latitude / Restaurant_longitude**: GPS coordinates of the restaurant.
 
-- Delivery_location_latitude / Delivery_location_longitude: GPS coordinates of the customer delivery address.
+- **Delivery_location_latitude / Delivery_location_longitude**: GPS coordinates of the customer delivery address.
 
-- Type_of_order: Categorical variable describing the type of food (e.g., meal, snacks, drinks, buffet).
+- **Type_of_order**: Categorical variable describing the type of food (e.g., meal, snacks, drinks, buffet).
 
-- Type_of_vehicle: Type of vehicle used for delivery (e.g., scooter, motorcycle, cycle, electric scooter).
+- **Type_of_vehicle**: Type of vehicle used for delivery (e.g., scooter, motorcycle, cycle, electric scooter).
 
-- Temperature: Ambient temperature at the time of delivery (°C).
+- **Temperature**: Ambient temperature at the time of delivery (°C).
 
-- Humidity: Relative humidity (%) during delivery.
+- **Humidity**: Relative humidity (%) during delivery.
 
-- Weather_description: Textual description of weather (e.g., "sunny", "cloudy", "stormy").
+- **Weather_description**: Textual description of weather (e.g., "sunny", "cloudy", "stormy").
 
-- Traffic_Level: Categorical description of traffic congestion (e.g., "very low", "low", "moderate", "high", "very high").
+- **Traffic_Level**: Categorical description of traffic congestion (e.g., "very low", "low", "moderate", "high", "very high").
 
-- Distance (km): Computed distance between restaurant and delivery location in kilometers.
+- **Distance (km)**: Computed distance between restaurant and delivery location in kilometers.
 
-- TARGET: Delivery time in minutes (target variable for prediction).
+- **TARGET**: Delivery time in minutes (target variable for prediction).
 
 ## 2.2 Data Cleaning and Exploratory Data Analysis
 
@@ -88,6 +91,7 @@ library(stringr)
 library(brglm2)
 library(mgcv)
 library(kableExtra)
+library(neuralnet)
 #suppressPackageStartupMessages(library(tidyverse))
 #library(tidyverse)
 
@@ -172,7 +176,7 @@ ggplot() +
              aes(x = customer_longitude_deg, y = customer_latitude_deg),
              color = "red", size = 2, alpha = 0.7, shape = 16) +
   coord_sf(xlim = bbox.limits[c(1, 3)], ylim = bbox.limits[c(2, 4)]) +
-  labs(title = "Figure 1: Restaurant and Delivery Locations",
+  labs(title = "Restaurant and Delivery Locations",
        x = "Longitude", y = "Latitude") +
   theme_minimal() +
   theme(plot.title = element_text(hjust = 0.5))
@@ -250,7 +254,7 @@ df_clean <- df.food_time.clean %>%
       weather_description_cleaned %in% c("mist", "moderate rain", "light rain") ~ "Rainy",
       TRUE ~ NA_character_
     ), levels = c("Clear", "Poor Visibility", "Rainy"), ordered = FALSE),
-    weather_category = relevel(weather_category, ref = "clear"),
+    weather_category = relevel(weather_category, ref = "Clear"),
 
     # Flag for long delivery time
     long_delivery_flag = if_else(delivery_time_min >= 40, 1, 0),
@@ -270,7 +274,7 @@ dim(df_clean)
 
 # View the cleaned dataset
 head(df_clean)
-#write.csv(df_clean, "../data/cleaned_data.csv", row.names = FALSE)
+
 ```
 
 ### 2.2.3 Exploratory Data Analysis
@@ -531,27 +535,15 @@ ggpairs(df_clean[, selected_cols])
 As the above pairs plot displays no strong relationships between the continuous predictors and since all of the Pearson's correlation coefficients are low, we can conclude that no more interactions need to be included in the model.
 
 
-# 3. Modelling 
+# 3. Models
 
-The following chapter will contain all the models which we fitted for our dataset.
-
-This includes:
-
-- Linear Model
-- Generalised Linear Model
-- Generalized Additive Model
-- Support Vector Machine
-- Artificial neural network
-
+The following chapter contains all the models which we fitted for our dataset.
 
 ## 3.1 Linear Model
 
-After investigating both numerical and categorical variables, we now begin fitting linear regression models. Our target variable is **Delivery Time in minutes**. For modeling purposes, we apply a **log-transformation** to the target variable (see EDA section for justification).
+After investigating both numerical and categorical variables, we now begin fitting linear regression models. Our target variable is Delivery Time in minutes. For modeling purposes, we apply a log-transformation to the target variable (see EDA section for justification).
 
-Before fitting the first model, we need to split the data into training and test sets. We do this using **stratified sampling based on the factor `traffic_level_factor`**.
-
-**Reasoning:**  
-During EDA, we observed an imbalance in the `traffic_level_factor`, and it appeared to be a strong predictor. Therefore, stratified sampling ensures that this imbalance is proportionally reflected in both the training and test datasets.
+Before fitting the first model, we need to split the data into training and test sets. We do this using stratified sampling based on the factor `traffic_level_factor`. This because, during EDA we observed an imbalance in the `traffic_level_factor`, and it appeared to be a strong predictor. Therefore, stratified sampling ensures that this imbalance is proportionally reflected in both the training and test datasets.
 
 ```{r}
 set.seed(42) # starting point for pseudo randomness
@@ -561,7 +553,7 @@ train_data <- df_clean[train_indices, ]
 test_data  <- df_clean[-train_indices, ]
 ```
 
-### 3.1.1 First Linear model - no interaction
+### 3.1.1 First Linear model
 
 We begin by fitting a first linear model including all variables that appeared relevant based on insights from the EDA.
 
@@ -572,29 +564,7 @@ We include the following predictors:
 - `traffic_level_factor` (categorical)
 - `order_type_factor` (categorical)
 
-We estimate the following linear regression model:
-
-$$
-y_i = \beta_0 
-+ \beta_1 \cdot x_{1i} 
-+ \beta_2 \cdot x_{2i} 
-+ \sum_{k=1}^{K} \gamma_k \cdot d_{ki} 
-+ \sum_{j=1}^{J} \delta_j \cdot c_{ji} 
-+ \varepsilon_i
-$$
-**Legend:**
-
-- \( y_i \): Response variable for observation \( i \), here: log-transformed delivery time  
-- \( x_{1i}, x_{2i} \): Numeric predictor variables (here: delivery distance, courier rating)  
-- \( d_{ki} \): Dummy variables for the first categorical predictor (e.g., traffic level), where \( k = 1, \dots, K \)  
-- \( c_{ji} \): Dummy variables for the second categorical predictor (e.g., order type), where \( j = 1, \dots, J \)  
-- \( \beta_0 \): Intercept term  
-- \( \beta_1, \beta_2 \): Coefficients for numeric predictors  
-- \( \gamma_k \): Coefficients for dummy variables of the first categorical predictor  
-- \( \delta_j \): Coefficients for dummy variables of the second categorical predictor  
-- \( \varepsilon_i \): Error term capturing the residual for observation \( i \)
-
-*Note: For each categorical variable, one level is omitted (reference category), and the others are represented through dummy variables.*
+We estimate the following linear regression model as in the code section below.
 
 ```{r, echo = TRUE}
 # Fitting linear model with two numeric and two categorical variables
@@ -606,83 +576,37 @@ lm.delivery1 <- lm(log_delivery_time ~ distance_km + courier_rating_1_to_5 + tra
 lm.delivery1
 ```
 
-#### Interpretation of model `lm.delivery1`
+<br>
 
-**`Intercept`:** 
+#### Interpretation of model coefficients `lm.delivery1`
 
-The intercept on the log-transformed scale is estimated at 2.528.  
-\[
-\exp(2.528) \approx 12.53
-\]  
-This corresponds to an expected delivery time of around 12.53 minutes when all numeric predictors are 0 and all categorical variables are at their reference levels. This value has no practical interpretation but is needed for the model.
+The `Intercept` on the log-transformed scale is estimated at 2.528. Taking the exponential of 2.528 yields 12.53, which represents the expected delivery time (in minutes) when all numeric predictors are set to 0 and all categorical predictors are at their reference levels. This value has no practical interpretation but is needed for the model.
 
-**`distance_km`:**  
+There is strong evidence that the slope of `distance_km` is not zero. Each additional kilometer increases the log-delivery time by approximately 0.0134. The exponential of 0.0134 is equal to 1.0134, which implies an increase in delivery time of **1.34% per additional kilometer**.
 
-There is strong evidence that the slope of `distance_km` is not zero. Each additional kilometer increases the log-delivery time by approximately 0.0134.  
-On the original scale:
-\[
-\exp(0.0134) \approx 1.0134
-\]  
-This implies an increase in delivery time of **1.34% per additional kilometer**.
+There is **no significant effect** of the `courier_rating_1_to_5` on the delivery time. The p-value is 0.242 (>> 0.05) and the 95% confidence interval includes 0 ([-0.0151, 0.0038]). Therefore, we will consider removing this variable in the next step.
 
-**`courier_rating_1_to_5`:**  
+For `traffic_level_factor` "very low"` represents the reference level. All other levels show highly significant positive coefficients, indicating longer delivery times with increasing traffic. As an example, the coefficient of traffic level "very high" is 1.219. The exponent of 1.219 is 3.38, which means that deliveries under very high traffic take on average **3.38 times longer** than under very low traffic, holding all other variables constant.
 
-There is **no significant effect** of the courier rating on the delivery time.  
-- The p-value is 0.242 (>> 0.05).  
-- The 95% confidence interval includes 0: \([-0.0151,\ 0.0038]\)
+For `order_type_factor` the reference level is `"Buffet"`. All other order types are significant, though their effects are smaller compared to traffic level. As an example, the coefficient of "Drinks" is 0.214. The exponent of 0.214 is 1.239, which means that deliveries with drinks take **23.9% longer** on average. This could be due to the delicate handling required for beverages (speculative).
 
-Therefore, we will consider removing this variable in the next step.
-
-**`traffic_level_factor`:**  
-
-"very low"` represents the reference level. All other levels show highly significant positive coefficients, indicating longer delivery times with increasing traffic.
-
-Example – `"very high"` traffic:  
-Coefficient: 1.219  
-\[
-\exp(1.219) \approx 3.38
-\]  
-This means that deliveries under very high traffic take on average **3.38 times longer** than under very low traffic, holding all other variables constant.
-
-**`order_type_factor`:**  
-
-Reference level is `"Buffet"`. All other order types are significant, though their effects are smaller compared to traffic level.
-
-Example – `"Drinks"`:  
-Coefficient: 0.214  
-\[
-\exp(0.214) \approx 1.239
-\]  
-Deliveries with drinks take **23.9% longer** on average. This could be due to the delicate handling required for beverages (speculative).
-
-
+<br>
 
 #### Model performance of `lm.delivery1`
 
-**R-squared: 0.9202**  
+The R-squared value of the model was 0.9202. This indicates that **92.02% of the variance** in the log-transformed delivery time is explained by the model.
 
-This indicates that **92.02% of the variance** in the log-transformed delivery time is explained by the model.
+The adjusted R² (value = 0.9201) accounts for the number of predictors and penalizes model complexity. The fact that it is almost identical to the regular R² suggests that all included predictors contribute meaningfully to the model.
 
-**Adjusted R-squared: 0.9201**  
+The Residual Standard Error (RSE) was 0.1332 (on the log scale). This measures the average deviation of the observed log-delivery times from the fitted values. To interpret it on the original scale we exponentiate 0.1332 and receive a value of 1.142. This can be interpreted that on average the predicted delivery time differs from observed values by approximately **14.2%**.
 
-Adjusted R² accounts for the number of predictors and penalizes model complexity. The fact that it is almost identical to the regular R² suggests that all included predictors contribute meaningfully to the model.
+These three metrics suggests that the model fits the data well and explains most of the variation in the response variable.
 
-**Residual Standard Error (RSE): 0.1332 (on log scale)**  
-
-This measures the average deviation of the observed log-delivery times from the fitted values. To interpret it on the original scale:
-
-\[
-\exp(0.1332) \approx 1.142
-\]
-
-On average, predicted delivery times differ from observed values by approximately **14.2%**.
-
-Overall, this suggests that the model fits the data very well and explains most of the variation in the response variable.
-
+<br>
 
 #### Diagnostic plots for `lm.delivery1`
 
-We created two diagnostic plots to assess the quality of our model:
+As Diagnostic plots for `lm.delivery1`, we created a Residuals vs Fitted Values plot and a Q-Q Plot.
 
 ```{r, fig.width=12, fig.height = 6}
 # diagnostic plots
@@ -712,21 +636,14 @@ p2 <- ggplot(df_plot, aes(sample = residuals)) +
 p1 + p2
 ```
 
-1. **Residuals vs Fitted Values**  
-This plot shows that residuals are roughly centered around zero, and most values lie within the range of -0.4 to +0.4.  
-We observe slight vertical striping, this is likely to be caused by the categorical variables.  
-There is also a mild indication of **heteroscedasticity** (increasing spread toward higher fitted values), suggesting that the variance is not completely constant.  
-This would technically violate the homoscedasticity assumption of linear regression, but the effect seems minor and we will tolerate it in our case.
+The Residuals vs Fitted Values plot shows that residuals are roughly centered around zero, and most values lie within the range of -0.4 to +0.4. We observe slight vertical striping, this is likely to be caused by the categorical variables. There is also a mild indication of heteroscedasticity (increasing spread toward higher fitted values), suggesting that the variance is not completely constant. This would technically violate the homoscedasticity assumption of linear regression, but the effect seems minor and we will tolerate it in our case.
 
-2. **Q-Q Plot**  
-The Q-Q plot indicates that residuals are approximately normally distributed.  
-There are no major deviations from the reference line, which supports the validity of the normality assumption.
+Additionally, the Q-Q plot indicates that residuals are approximately normally distributed. There are no major deviations from the reference line, which supports the validity of the normality assumption.
 
-Conclusion:  
-We do not observe any severe violations of linear model assumptions. Therefore, we proceed with the current model and consider variable selection next.
+In conclusion, we do not observe any severe violations of linear model assumptions. Therefore, we proceed with the current model and consider variable selection next.
 
 
-### 3.1.2 Second Linear Model – simplification of model 1
+### 3.1.2 Second Linear Model
 
 To assess the impact of individual variables, we use the `drop1()` function. This allows us to test the effect of removing each predictor while keeping the others constant.
 
@@ -735,15 +652,9 @@ To assess the impact of individual variables, we use the `drop1()` function. Thi
 drop1(lm.delivery1, test = "F")
 ```
 
-Based on the output of `drop1()`, as well as the earlier `summary()`, we observe the following:
+Based on the output of `drop1()`, as well as the earlier `summary()`, we observe that the variable `courier_rating_1_to_5` has a high p-value, meaning we have no evidence to reject the null hypothesis of the variable's coefficient being zero. Removing this variable results in only a very small increase in the residual sum of squares (RSS), from 128.16 to 128.19 also, the Akaike Information Criterion (AIC) remains unchanged.
 
-- The variable `courier_rating_1_to_5` has a **high p-value**, indicating no significant contribution to the model.
-- Removing this variable results in only a **very small increase** in the residual sum of squares (RSS), from 128.16 to 128.19.
-- The **Akaike Information Criterion (AIC)** remains unchanged.
-
-This suggests that excluding `courier_rating_1_to_5` does not worsen the model and should simplify interpretation.
-
-We therefore fit a second model `lm.delivery2`, without `courier_rating_1_to_5`. 
+This suggests that excluding `courier_rating_1_to_5` does not worsen the model and should simplify interpretation. We therefore fit a second model `lm.delivery2`, without `courier_rating_1_to_5`. 
 
 ```{r, collapse=TRUE}
 # Simplifying the model
@@ -753,12 +664,9 @@ lm.delivery2
 ```
 
 
-A comparison of the Coefficient estimates between `lm.delivery1` and `lm.delivery2` shows that:
+A comparison of the Coefficient estimates between `lm.delivery1` and `lm.delivery2` shows that the R-squared and Adjusted R-squared remain unchanged. The model quality is therefore practically the same.
 
-- R-squared and Adjusted R-squared remain unchanged.
-- The model quality is practically the same.
-
-
+<br>
 
 #### AIC Comparison: Model 1 vs Model 2
 
@@ -769,27 +677,20 @@ AIC(lm.delivery1)
 AIC(lm.delivery2)
 ```
 
-Finally, the AIC values of both models are nearly identical, again supporting the simplification.  
-
-**Conclusion:** The model can be reduced without losing explanatory information by removing `courier_rating_1_to_5`.
+Finally, the AIC values of both models are nearly identical, again supporting the simplification. We conclude, that the model can be reduced without losing explanatory information by removing `courier_rating_1_to_5`.
 
 
-### 3.1.3 Third Linear Model – including interaction
+### 3.1.3 Third Linear Model – incl. interaction
 
-In the next step, we explore whether an interaction exists between `distance_km` and `traffic_level_factor`.
+In the next step, we explore whether an interaction exists between `distance_km` and `traffic_level_factor`. We chose to do so, because the effect of distance on delivery time may be different / stronger under heavy traffic conditions. For example, slow progress over a long distance could lead to a much longer delivery times.
 
-**Motivation:**  
-The effect of distance on delivery time may be different / stronger under heavy traffic conditions. For example, slow progress over a long distance could lead to a much longer delivery times.
+We therefore fit a third model including the interaction term (see code chunk below).
 
-We therefore fit a third model including the interaction term:
-
-```r
+```{r}
 log_delivery_time ~ distance_km * traffic_level_factor + order_type_factor
 ```
 
-This model includes:
-- Main effects of `distance_km`, `traffic_level_factor`, and `order_type_factor`
-- All interaction terms between `distance_km` and `traffic_level_factor`
+This model includes the main effects of `distance_km`, `traffic_level_factor`, and `order_type_factor` as well as all interaction terms between `distance_km` and `traffic_level_factor`.
 
 ```{r, collapse=TRUE}
 # Including interaction between distance_km and traffic_level_factor
@@ -799,51 +700,38 @@ lm.interaction <- lm(log_delivery_time ~ distance_km * traffic_level_factor + or
 lm.interaction
 ```
 
-**Model comparison:**
+Comparing the two models we observe that the residual standard error is lower than in the previous model, showing a better fit. Both R-squared and Adjusted R-squared are slightly higher. The F-statistic from `summary()` is higher for the simpler model `lm.delivery2`, but this is due to fewer parameters (F-stat compares against a null model - having no predictors).
 
-- The **residual standard error** is lower than in the previous model, showing a better fit.
-- Both **R-squared** and **Adjusted R-squared** are slightly higher.
-- The **F-statistic** from `summary()` is higher for the simpler model `lm.delivery2`, but this is due to fewer parameters (F-stat compares against a null - having no predictors).
+To formally compare both models, We use both the Akaike Information Criterion (AIC) and an ANOVA test to compare the simpler model (`lm.delivery2`) with the interaction model (`lm.interaction`).
 
-To formally compare both models, we further use **AIC** and **ANOVA**.
+<br>
 
-##### AIC comparison
+#### AIC comparison
 ```{r}
 # Compare AIC values
 AIC(lm.delivery2)
 AIC(lm.interaction)
 ```
 
+The AIC for `lm.interaction` is lower than for `lm.delivery2`, indicating a better fit despite the increased complexity.
+
+<br>
+
 #### ANOVA comparison
 ```{r}
 # anova to compare models
 anova(lm.delivery2, lm.interaction)
 ```
+The ANOVA test shows a significant reduction in the residual sum of squares when moving from the simpler model to the interaction model. The F-statistic is high and the corresponding p-value is very small.
 
-#### Model comparison: `lm.delivery2` vs `lm.interaction`
-
-We use both the Akaike Information Criterion (AIC) and an ANOVA test to compare the simpler model (`lm.delivery2`) with the interaction model (`lm.interaction`).
-
-**AIC comparison:**  
-The AIC for `lm.interaction` is **lower** than for `lm.delivery2`, indicating a better fit despite the increased complexity.
-
-**ANOVA comparison:**  
-The ANOVA test shows a **significant reduction** in the residual sum of squares when moving from the simpler model to the interaction model.  
-- The F-statistic is high.
-- The corresponding p-value is very small.
-
-**Conclusion:**  
-Both AIC and ANOVA favor the model including the interaction.  
-We therefore select `lm.interaction` as our preferred model. This result supports the hypothesis that the effect of distance on delivery time depends on the traffic level.
+Both AIC and ANOVA favor the model including the interaction. We therefore select `lm.interaction` as our preferred model. This result supports the hypothesis that the effect of distance on delivery time depends on the traffic level.
 
 
 ### 3.1.4 Predictions
 
-After selecting `lm.interaction` as our final model, we now evaluate its performance on the **test dataset**.
+After selecting `lm.interaction` as our final model, we now evaluate its performance on the test dataset.
 
-We start by generating predictions on the log-scale using the `predict()` function and then transform them back to the original scale (minutes) using `exp()`.
-
-We compare the predicted delivery times to the actual values using scatter plots and vertical error bars to visualize the prediction error.
+We start by generating predictions on the log-scale using the `predict()` function and then transform them back to the original scale (minutes) using `exp()`. After that we compare the predicted delivery times to the actual values using scatter plots and vertical error bars to visualize the prediction error.
 
 ```{r}
 # Prediction, exponentation of prediction and actual delivery time from test_data
@@ -895,35 +783,11 @@ short_deliveries <- results[results$actual_min < 40, ]
 rmse_short <- sqrt(mean((short_deliveries$predicted_min - short_deliveries$actual_min)^2))
 rmse_short
 ```
+We observe that for deliveries under 40 minutes, the predicted values are very close to the actual ones. The model performs well in this range. For longer delivery times (above 50 minutes), the variance increases and the predictions become less precise. A few, rather extreme outliers are present for very long delivery times. Overall, the predicted vs actual relationship appears approximately linear, and the model performs robustly.
 
-**Observations:**
+We also calculated two common evaluation metrics, the Root Mean Squared Error (RMSE) and the R-squared. The RMSE was **5.59 minutes** and the R-squared 0.883. This tells us that the average prediction error is around 5.6 minutes and that the model explains 88.3% of the variance in delivery times on unseen data. This R² is only slightly below the training R², which suggests no overfitting.
 
-- For deliveries under **40 minutes**, the predicted values are very close to the actual ones. The model performs well in this range.
-- For longer delivery times (above 50 minutes), the **variance increases** and the predictions become less precise.
-- A few, rather extreme outliers are present for very long deliveries.
-- Overall, the predicted vs actual relationship appears **approximately linear**, and the model performs **robustly**.
-
-We also calculate two common evaluation metrics:
-
-- **Root Mean Squared Error (RMSE):**  
-  On the full test set:  
-  \[
-  \text{RMSE} \approx 5.59 \text{ minutes}
-  \]  
-On average, the prediction error is around 5.6 minutes.
-
-- **R-squared (on test data):**  
-  \[
-  R^2 \approx 0.883
-  \]  
-  → The model explains 88.3% of the variance in delivery times on unseen data, only slightly below the training R², which suggests **no overfitting**.
-
-In addition, we compute the RMSE for **short deliveries (< 40 minutes)** only:
-\[
-\text{RMSE}_{\text{short}} \approx 3.09 \text{ minutes}
-\]  
-The model performs **even better** in this range.
-
+Lasty, we computed the RMSE for short deliveries (< 40 minutes) only, which resulted in a RMSE value of 3.09. This indicates that the prediction error is on average 3.1 minutes, meaning the predictions for delivery times under 40 minutes are even more exact.
 
 ## 3.2 Generalized Linear Models
 
@@ -938,15 +802,7 @@ In the initial Poisson model, continuous variables such as `courier_age_years`, 
 The results showed in the model summary indicates that the p-values for `courier_age_years`, `precipitation_mm`, and `vehicle_type_factor` are greater than 0.05, suggesting that they do not contribute significantly to the model. Therefore, they will not be considered in the second round of modeling.
 
 
-```{r, message = FALSE, warning = FALSE, collapse=TRUE}
-# read data
-#df_clean <- read.csv("../data/cleaned_data.csv")
-
-
-#  Convert to unordered factor
-df_clean$traffic_level_factor <- factor(df_clean$traffic_level_factor, ordered = FALSE)
-#  Set the reference level
-df_clean$traffic_level_factor <- relevel(df_clean$traffic_level_factor, ref = "very low")
+```{r, poisson_m1, message = FALSE, warning = FALSE, collapse=TRUE}
 
 # regression with glm poisson model
 poisson.model.test <- glm(
@@ -969,7 +825,7 @@ Additionally, the ´residual deviance´ slightly increases from 7492.1 to 7497.7
 Overall, the second Poisson model is more parsimonious and performs better based on the AIC value. The estimated model,expressed in its exponentiated form, is:
  
 
-```{r, collapse=TRUE}
+```{r, poisson_m2, collapse=TRUE}
 # check traffic_level_factor
 table(df_clean$traffic_level_factor, useNA = "always")
 # Refine the Poisson regression by removing unnecessary variables.
@@ -984,9 +840,9 @@ poisson.model <- glm(
 # check model summary
 summary(poisson.model)
 ```
-\[
+$$
 \begin{aligned}
-\text{Log(average_speed_kmph)} = 2.627 &- 0.006 \cdot \text{temperature_celsius} \\
+\text{average_speed_kmph} = \exp(2.627 &- 0.006 \cdot \text{temperature_celsius} \\
 &- 0.002 \cdot \text{humidity_percent} 
 + 0.036 \cdot \text{distance_km} \\
 &+ 0.162 \cdot \text{traffic_level_factorhigh}
@@ -994,13 +850,14 @@ summary(poisson.model)
 &+ 0.275 \cdot \text{traffic_level_factormoderate}
 - 0.143 \cdot \text{traffic_level_factorvery high} \\
 &- 0.046 \cdot \text{weather_categoryPoorVisibility}
-- 0.072 \cdot \text{weather_categoryRainy}
+- 0.072 \cdot \text{weather_categoryRainy})
 \end{aligned}
-\]
 \
+$$
 
 #### 3.2.1.2 Interpretation of coefficients
-Because the Poisson model uses a log-link function, the coefficients are interpreted in terms of their Incidence Rate Ratios (IRRs). The IRR is the exponentiated coefficient from the Poisson regression
+Because the Poisson model uses a log-link function, the coefficients are interpreted in terms of their Incidence Rate Ratios (IRRs). The IRR is the exponentiated coefficient from the Poisson regression.
+
 - *Continuous Variables*
 
 The variable ´temperature_celsius´ has an exponentiated coefficient of 0.99, which means that for every 1°C increase in temperature, the expected delivery speed decreases by approximately 1%. This suggests that higher temperatures slightly reduce speed, possibly due to fatigue or decreased performance in hot weather.
@@ -1021,7 +878,7 @@ For the ´weather_category´, ´weather_categoryClear´ was taken as the baselin
 
 
 
-```{r}
+```{r, poisson_IC_1}
 
 # Extract variables of interest
 vars <- c("traffic_level_factorhigh", 
@@ -1047,8 +904,8 @@ coef_table <- data.frame(
 # Display as a kable table
 kable(coef_table, caption = "Poisson Regression Coefficients and IRRs") %>% 
   kable_styling(full_width = F) %>% 
-  column_spec(2, width ="4cm") %>% 
-  column_spec(3, width ="4cm")
+  column_spec(1, width ="4cm") %>% 
+  column_spec(2, width ="4cm")
 
 ```
 
@@ -1070,7 +927,7 @@ Slight discrepancies appear under "Very High" traffic, where the model tends to 
 
 This comparison validates that the Poisson model reasonably replicates key patterns in the data and supports its use for simulating delivery behavior under varying traffic levels.
 
-```{r, fig.align='center'}
+```{r, poisson_CP_1, fig.align='center'}
 # simulate some data from this model
 set.seed(2)
 sim.data.average_speed_kmph.Poisson <- simulate(poisson.model)
@@ -1101,7 +958,7 @@ ggplot(df_plot_combined, aes(x = Traffic_Level, y = speed, fill = Type)) +
   geom_boxplot(outlier.shape = 21, alpha = 0.7, position = position_dodge(width = 0.8)) +
   scale_fill_manual(values = c("Real" = "skyblue", "Simulated" = "lightpink")) +
   labs(
-    title = "Figure x: Real vs. Simulated Delivery Speeds by Traffic Level",
+    title = "Real vs. Simulated Delivery Speeds by Traffic Level",
     x = "Traffic Level",
     y = "Average Speed (km/h)",
     fill = "Speed Type"
@@ -1127,7 +984,7 @@ To check for overdispersion, we calculated the overdispersion statistic using Pe
 **Conclusion**
 The residual diagnostics show no major issues with model specification. The model appears to fit the data reasonably well, with no evidence of significant overdispersion or major misspecification.
 
-```{r, fig.width=12, fig.height = 6}
+```{r, poisson_RA_1, fig.width=12, fig.height = 6}
 
 # residual analysis
 # 1.compute residuals
@@ -1186,11 +1043,6 @@ kable(overdisp_table, caption = "Overdispersion Check Result") %>%
 First step is preprocessing the data further for the binomial model. This includes removing the "bicycle" observations from `vehicle_type_factor` as they are too scarce and could negatively impact on model fitting.
 
 ```{r}
-#  Convert to unordered factor
-df_clean$weather_category <- factor(df_clean$weather_category, ordered = FALSE)
-#  Set the reference level
-df_clean$weather_category <- relevel(df_clean$weather_category, ref = "Clear")
-
 # Pre-process vehicle_type_factor
 df_clean_binomial <- df_clean %>%
   # Remove bicycle as only 10 observations
@@ -1303,8 +1155,8 @@ The accuracy of the model (with threshold = 0.5) is 93.2% which is very good. 54
 #### Interpretation
 
 The estimated model,expressed in its exponentiated form, is:
+$$
 
-\[
 \begin{aligned}
 \text{long_delivery_flag} = \exp(&\, -16.381 
 + 0.084 \cdot \text{temperature_celsius} \\
@@ -1319,9 +1171,9 @@ The estimated model,expressed in its exponentiated form, is:
 &+ 0.448 \cdot \text{weather_categoryPoorVisibility}
 + 1.105 \cdot \text{weather_categoryRainy})
 \end{aligned}
-\]
-\
 
+\
+$$
 As for the interpretation of these coefficients:
 
 * At reference level: (temperature_celsius = 0, distance_km = 0, order_type_factor = "Buffet", traffic_level_factor = "very low", weather_category = "Clear") the probability of a long delivery is:
@@ -1371,9 +1223,7 @@ First, all continuous and categorical variables are included in an initial GAM t
 
 The first round of results shows that the adjusted R-squared is 0.858. The statistically significant predictors, marked with '***', include the 'Intercept', 'temperature_celsius', 'humidity_percent', 'distance_km', and 'traffic_level_factor', suggesting they have a meaningful impact on delivery time. In contrast, variables such as 'courier_age_years', 'precipitation_mm', 'vehicle_type_factor', and 'weather_category' have p-values greater than 0.05 and therefore do not significantly contribute to the model. These non-significant variables will be excluded in the next modeling steps. 
 
-```{r, warning=FALSE, message=FALSE, collapse=TRUE}
-# again loading the cleaned data as df_clean
-#df_clean <- read.csv("../data/cleaned_data.csv")
+```{r, GAM_model_1, warning=FALSE, message=FALSE, collapse=TRUE}
 
 # 1st trial gam modeling with all possible variables
 gam.model.test1 <- gam(delivery_time_min ~ courier_age_years + temperature_celsius + humidity_percent 
@@ -1392,7 +1242,7 @@ The anova() function was used to compare the two models. This test assesses whet
 
 Lastly, comparing the AIC (Akaike Information Criterion), the value decreased from 58,762 (Model 1) to 57,308 (Model 2). Since lower AIC values indicate a better trade-off between model fit and complexity, this further supports Model 2 as the preferred model.
 
-```{r, collapse=TRUE}
+```{r, GAM_model_2, collapse=TRUE}
 # 2nd Attempt: Model with Selected Variables and Smooth Terms
 gam.model.test2 <- gam(delivery_time_min ~ s(temperature_celsius, bs = "cs", k=5) + 
                          s(humidity_percent, bs = "cs", k=5) + 
@@ -1406,6 +1256,9 @@ summary(gam.model.test2)
 # Run the anova model comparison
 anova_results <- anova(gam.model.test1, gam.model.test2, test = "F")
 
+# Convert to data frame
+anova_df <- as.data.frame(anova_results)
+
 # Create a data frame from the ANOVA results
 anova_table <- data.frame(
   Model = c("gam.model.test1", "gam.model.test2"),
@@ -1417,8 +1270,11 @@ anova_table <- data.frame(
   Pr_F = c(NA, format.pval(anova_df[["Pr(>F)"]][2], digits = 2))
 )
 
-# Print the ANOVA results table using kable
-knitr::kable(anova_table, digits = 2, align = 'c', caption = "ANOVA Comparison Between gam.model.test1 and gam.model.test2")
+# Display the ANOVA comparison table
+kable(anova_table, digits = 2, align = 'c', caption = "ANOVA Comparison: gam.model.test1 vs gam.model.test2") %>%
+  kable_styling(full_width = FALSE, position = "center", bootstrap_options = c("striped", "hover", "condensed")) %>%
+  column_spec(1, width = "4cm") %>%
+  column_spec(2:7, width = "2.5cm")
 
 # run AIC comparing test1 and test2
 
@@ -1434,9 +1290,13 @@ model_comparison <- data.frame(
   R2 = c(0.858, 0.879)
 )
 
-# Print the table
-kable(model_comparison, digits = 2, align = 'c', caption = "Model Comparison: gam.model.test1 vs gam.model.test2")
+# Display the model comparison table
+kable(model_comparison, digits = 2, align = 'c', caption = "Model Comparison: gam.model.test1 vs gam.model.test2") %>%
+  kable_styling(full_width = FALSE, position = "center", bootstrap_options = c("striped", "hover", "condensed")) %>%
+  column_spec(1, width = "4cm") %>%
+  column_spec(2:5, width = "2.5cm")
 ```
+
 
 
 **Gam model 3, integrate interactions**
@@ -1457,7 +1317,7 @@ Although `gam.model.test6` fits slightly better, the improvement is minimal, and
 
 Therefore, `gam.model.test8` is preferable for its simplicity and comparable performance. It retains the significant interaction and avoids unnecessary terms that may lead to overfitting.
 
-```{r, collapse=TRUE, out.width = "100%", fig.height = 2}
+```{r, GAM_model_3, collapse=TRUE, out.width = "100%", fig.height = 2}
 # 6th fitting, include recommended interations to the GAM with shrinkage of cyclic spline
 gam.model.test6 <- gam(delivery_time_min ~ s(temperature_celsius, bs = "cs", k=5) + 
                                            s(humidity_percent, bs = "cs", k=5) + 
@@ -1473,7 +1333,7 @@ summary(gam.model.test6)
 par(mfrow = c(1, 3))
 
 # Plot each smooth term individually
-plot(gam.model.test6, select = 1, se = TRUE, rug = TRUE, main = "Test6: Temp Smooth Term")
+plot(gam.model.test6, select = 1, se = TRUE, rug = TRUE, main = "Test6: Temperature Smooth Term")
 plot(gam.model.test6, select = 2, se = TRUE, rug = TRUE, main = "Test6: Humidity Smooth Term")
 plot(gam.model.test6, select = 3, se = TRUE, rug = TRUE, main = "Test6: Distance Smooth Term")
 
@@ -1493,7 +1353,7 @@ summary(gam.model.test8)
 
 
 # Plot each smooth term individually
-plot(gam.model.test8, select = 1, se = TRUE, rug = TRUE, main = "Test8: Temp Smooth Term")
+plot(gam.model.test8, select = 1, se = TRUE, rug = TRUE, main = "Test8: Temperature Smooth Term")
 plot(gam.model.test8, select = 2, se = TRUE, rug = TRUE, main = "Test8: Humidity Smooth Term")
 plot(gam.model.test8, select = 3, se = TRUE, rug = TRUE, main = "Test8: Distance Smooth Term")
 
@@ -1511,17 +1371,23 @@ model_comparison <- data.frame(
 )
 
 # Print the table
-kable(model_comparison, digits = 2, align = 'c', caption = "Model Comparison: gam.model.test6 vs gam.model.test8")
+kable(model_comparison, digits = 2, align = 'c', caption = "Model Comparison: gam.model.test6 vs gam.model.test8") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
+                full_width = FALSE, 
+                position = "center") %>%
+  column_spec(1, width = "5cm") %>%
+  column_spec(2:4, width = "3cm")
 ```
 
 **Gam model 4, integrate log transformation on target variable**
+
 In the linear model, the target variable delivery_time_min was log-transformed to improve model performance (see Section 3.1). We apply the same transformation to gam.model.test8, resulting in gam.model.logtest8, and compare the performance to the untransformed version.
 
 The model is fitted using the log-transformed delivery time (log_delivery_time) as the response variable while retaining the same predictors and interaction term (temperature_celsius:humidity_percent).
 
 The model achieves a high adjusted R² of 0.886, indicating that 88.6% of the variance in log-transformed delivery time is explained by the model. The GCV score is 0.0255, showing a low level of prediction error, which suggests `gam.model.logtest8` is a robust choice for modeling delivery time.
 
-```{r, collapse=TRUE}
+```{r, GAM_model_4, collapse=TRUE}
 # Adding log transformed delivery time to d.food_time
 df_clean <- df_clean %>%
   mutate(log_delivery_time = log(delivery_time_min))
@@ -1545,7 +1411,7 @@ To evaluate the performance of different modeling approaches for predicting deli
 
 - GAM on Original Scale (`gam.model.test8`) – A flexible GAM using cubic regression splines (bs = "cs") for numeric predictors and including an interaction between temperature and humidity.
 
-- GAM with Log-Transformed Target (`gam.model.logtest8`) – Same as test8, but applied to a log-transformed delivery time to account for potential skewness and stabilize variance.
+- GAM with Log-Transformed Target (`gam.model.logtest8`) – applied to a log-transformed delivery time to account for potential skewness and stabilize variance.
 
 The results show:
 
@@ -1553,8 +1419,8 @@ The log-transformed GAM model achieved the lowest RMSE (5.69) and lowest MAE (4.
 
 Overall, the results suggest that: Applying a log transformation to the target variable can further improve performance, likely due to reducing the influence of outliers and heteroscedasticity. These findings support the use of flexible models such as GAMs, especially when paired with appropriate transformations of the response variable.
 
-```{r}
-#  ---- For linear model test  ----
+```{r, GAM_MCE_1}
+#  ---- For GAM without smoothing terms  ----
 set.seed(99)
 train_index <- createDataPartition(df_clean$delivery_time_min, p = 0.8, list = FALSE)
 train_data <- df_clean[train_index, ]
@@ -1633,10 +1499,17 @@ model_comparison %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
 ```
 
-**visualization**
+**Visualization of Model Residuals and Predictions**
 
+The figure below compares the residuals and predicted vs. actual values for each model:
 
-```{r, out.width = "100%", fig.height = 2}
+Top row: Residual plots for the GAM without Smooth, GAM (Original scale) with Smooth, and GAM (Log-Transformed) with Smooth. The residuals from the GAM without Smooth show a noticeable funnel shape and heteroscedasticity, while the GAMs (especially the log-transformed one) show more stable variance and better distribution around zero.
+
+Bottom row: Actual vs. predicted values for the same three models. The GAM without Smooth exhibits greater deviation from the 45-degree line (red), indicating less accurate predictions. Both GAM variants hug the diagonal more closely, with the Log-Transformed GAM showing the tightest clustering around the line, confirming its superior predictive performance.
+
+These visual diagnostics reinforce the numerical results: the Log-Transformed GAM provides both better calibration and reduced error, highlighting the importance of handling non-linear relationships and skewed target distributions.
+
+```{r, GAM_MCE_2, out.width = "100%", fig.height = 2}
 # Predicted values
 df_clean$pred_lm      <- predict(gam.model.traintest1, newdata = df_clean)
 df_clean$pred_gam     <- predict(gam.model.traintest8, newdata = df_clean)
@@ -1651,15 +1524,15 @@ df_clean$resid_log_gam <- df_clean$delivery_time_min - df_clean$pred_log_gam
 par(mfrow = c(1, 3))
 
 plot(df_clean$resid_lm, 
-     main = "Residuals: Linear Model", 
+     main = "GAM without Smooth", 
      ylab = "Residuals", xlab = "Index", col = "darkgreen", pch = 20)
 
 plot(df_clean$resid_gam, 
-     main = "Residuals: Smooth GAM", 
+     main = "GAM (Original scale) with Smooth", 
      ylab = "Residuals", xlab = "Index", col = "blue", pch = 20)
 
 plot(df_clean$resid_log_gam, 
-     main = "Residuals: Log-Transformed GAM", 
+     main = "GAM (Log-Transformed) with Smooth", 
      ylab = "Residuals", xlab = "Index", col = "purple", pch = 20)
 
 
@@ -1667,19 +1540,19 @@ plot(df_clean$resid_log_gam,
 par(mfrow = c(1, 3))
 
 plot(df_clean$delivery_time_min, df_clean$pred_lm,
-     main = "Linear Model",
+     main = "GAM without Smooth",
      xlab = "Actual", ylab = "Predicted",
      pch = 19, col = rgb(0, 0.6, 0, 0.3))
 abline(0, 1, col = "red", lwd = 2)
 
 plot(df_clean$delivery_time_min, df_clean$pred_gam,
-     main = "Smooth GAM (Original)",
+     main = "GAM (Original Scale) with Smooth",
      xlab = "Actual", ylab = "Predicted",
      pch = 19, col = rgb(0, 0, 1, 0.3))
 abline(0, 1, col = "red", lwd = 2)
 
 plot(df_clean$delivery_time_min, df_clean$pred_log_gam,
-     main = "Log-Transformed GAM",
+     main = "GAM (Log-Transformed) with Smooth",
      xlab = "Actual", ylab = "Predicted",
      pch = 19, col = rgb(0.5, 0, 0.5, 0.3))
 abline(0, 1, col = "red", lwd = 2)
@@ -1690,18 +1563,35 @@ abline(0, 1, col = "red", lwd = 2)
 par(mfrow = c(1, 1))
 ```
 
+
+### 3.3.3 Interpretation
+After fine-tuning and comparison, the fitted Generalized Additive Model (GAM) is specified as: 
+
+$$
+\begin{aligned}
+\text{delivery_time_min} =\exp(\ & 3.272  + 0.277 \cdot \text{traffic_level}_{\text{low}} + 0.507 \cdot \text{traffic_level}_{\text{moderate}} \\ &+ 0.741 \cdot \text{traffic_level}_{\text{high}} 
++ 1.002 \cdot \text{traffic_level}_{\text{very high}} 
++ 0.030 \cdot \text{weather}_{\text{Poor Visibility}} \\
+&+ 0.060 \cdot \text{weather}_{\text{Rainy}} 
+- 0.000249 \cdot (\text{temperature_celsius} \times \text{humidity_percent}) \\
+&+ f_1(\text{temperature_celsius}) 
++ f_2(\text{humidity_percent}) 
++ f_3(\text{distance_km}) 
++ \varepsilon)
+\end{aligned}
+$$
+The model indicates that traffic level has the most substantial impact on delivery time: as traffic worsens from "low" to "very high," delivery time increases significantly, with "very high" traffic associated with exp(1.002)≈ 2.724 → 172.4% longer times compared to "normal" traffic, and with "high" traffic associated with exp(0.741)≈ 2.098 → 109.8% longer times, and with "moderate" traffic with exp(0.507)≈ 1.660× → 66.0% longer times. Weather conditions also influence delivery time, rainy weather and poor visibility lead to modest increases of about exp(0.060)≈1.062 → 6% longer and slight increase exp(0.030)≈1.030 → 3% longer, respectively. The interaction between temperature and humidity has a small but significant negative effect, suggesting that under certain combined conditions (e.g., hot and humid), delivery time may slightly decrease. Additionally, the smooth terms for temperature, humidity, and distance reveal complex, non-linear relationships with delivery time, highlighting that these factors do not influence delivery speed in simple straight-line ways but may have thresholds or diminishing effects.
+
+
 ## 3.4 Support Vector Machine
 
-In this section, we aim to classify the **traffic level** using SVM models.
+In this section, we aim to classify the **traffic level** using SVM models. The use case behind it could be, that the delivery company would like to use its data to classify the traffic level and for example sell this information about the traffic situation to a website / radio station. This use case would not completely hold in a real world situation, however it shall serve as an explanation for the choice of this classifier (and the educational purpose behind it).
 
 ### 3.4.1 Data Preparation
 
-We begin with the following steps:
+For the SVM model, we created a new dataset, `svm_data`, containing the selected features. Specifically, we chose `distance_km` and `average_speed_kmph` as predictors, and ensured that the target variable was converted to a factor. The data was then split into training and test sets using stratified sampling to preserve the class distribution.
 
-- Create a new dataset `svm_data` with relevant features
-- Ensure the target variable is a factor
-- Split the data into a training and a test set using **stratified sampling**
-
+We deliberately limited the model to these two predictors. First, they are both continuous and provide clear, interpretable relationships with delivery time. In contrast, exploratory plots indicated that the available categorical variables (e.g., order type) did not exhibit meaningful separation between delivery time classes. We aimed to build a simple and more robust model by limiting the features, ss SVM Models are prone to overfitting.
 
 ```{r}
 # Create input data for SVM
@@ -1719,16 +1609,9 @@ train_svm <- svm_data[split_index, ]
 test_svm  <- svm_data[-split_index, ]
 ```
 
-### 3.4.2 First SVM Model – Linear Kernel
+### 3.4.2 Modeling: First SVM Model – Linear Kernel
 
-We start with a basic SVM model using:
-
-- `distance_km`
-- `average_speed_kmph`
-
-We apply a **linear kernel** with a `cost` parameter of 10.
-
-To avoid overfitting, we scale the input variables and use the `e1071::svm()` function. Later, we will compare this model to a radial SVM and explore parameter tuning.
+We start with a basic SVM model using `distance_km` and `average_speed_kmph` and applied a linear kernel with a `cost` parameter of 10. To avoid overfitting, we scaled the input variables and use the `e1071::svm()` function. Later, we will compare this model to a radial SVM and explore parameter tuning.
 
 ```{r, collapse=TRUE}
 # Train SVM with linear kernel
@@ -1747,28 +1630,16 @@ pred_svm <- predict(svm_model1, newdata = test_svm)
 # Evaluate classification performance
 confusionMatrix(pred_svm, test_svm$traffic_level_factor)
 ```
+
+<br>
+
 #### Model Evaluation – Linear SVM
 
-We evaluate the prediction accuracy using a confusion matrix.
+We evaluated the prediction accuracy using a confusion matrix. We got an accuracy of 0.845, meaning 84.5% of the test set was correctly classified. The 95% confidence interval for the accuracy lies between 82.7% and 86.1%. The model performs significantly better than random guessing or choosing the most frequent class. However, the model struggles to distinguish between `"moderate"` and `"high"` traffic levels. In total 45 `"moderate"` observations were misclassified as `"high"` and 48 `"high"` observations were misclassified as `"moderate"`. This pattern is also reflected visually in the decision boundaries (see next section).
 
-**Results:**
+#### Visualizing SVM Decision Boundaries (Linear Kernel)
 
-- **Accuracy:** 84.5% of the test set was correctly classified
-- **95% CI:** Approximately 82.7% to 86.1%
-- **Significance:** The model performs significantly better than random guessing or choosing the most frequent class
-
-However, the model struggles to distinguish between `"moderate"` and `"high"` traffic levels:
-- 45 `"moderate"` observations were misclassified as `"high"`
-- 48 `"high"` observations were misclassified as `"moderate"`
-
-This pattern is also reflected visually in the decision boundaries (see next section).
-
-### 3.4.3 Visualizing SVM Decision Boundaries (Linear Kernel)
-
-To better understand how the SVM model separates traffic levels, we visualize the decision boundaries in the feature space defined by:
-
-- `distance_km`
-- `average_speed_kmph`
+To better understand how the SVM model separates traffic levels, we visualize the decision boundaries in the feature space defined by `distance_km` and `average_speed_kmph`.
 
 We generate a prediction grid and overlay it with the training points to illustrate the model's classification behavior.
 
@@ -1797,15 +1668,11 @@ ggplot() +
 
 #### Interpretation
 
-The decision regions show that the model draws clear boundaries between traffic levels. However, the overlap between `"moderate"` and `"high"` levels is visually noticeable — this confirms the misclassifications seen in the confusion matrix.
+The decision regions show that the model draws clear boundaries between traffic levels. However, the overlap between `"moderate"` and `"high"` levels is visually noticeable — this confirms the misclassifications seen in the confusion matrix. The linear kernel creates linear boundaries, which may not fully capture the complexity of the relationships in the data. Therefore, we next try a radial kernel (nonlinear).
 
-The linear kernel creates **linear boundaries**, which may not fully capture the complexity of the relationships in the data. Therefore, we next try a **radial kernel** (nonlinear).
+### 3.4.4 Modeling: Second SVM Model – Radial Kernel
 
-### 3.4.4 Second SVM Model – Radial Kernel
-
-We now fit a second model using a **radial basis function (RBF)** kernel. This allows for nonlinear decision boundaries, potentially improving performance in cases where classes overlap in complex ways.
-
-We use the same cost parameter as before (`cost = 10`) and set `gamma = 0.1`. Both variables are scaled.
+We now fit a second model using a **radial basis function (RBF)** kernel. This allows for nonlinear decision boundaries, potentially improving performance in cases where classes overlap in complex ways. We use the same cost parameter as before (`cost = 10`) and set `gamma = 0.1`. Both variables are scaled.
 
 ```{r, collapse=TRUE}
 # Train SVM with radial kernel
@@ -1824,21 +1691,18 @@ pred_rbf <- predict(svm_model2, newdata = test_svm)
 # Evaluate performance
 confusionMatrix(pred_rbf, test_svm$traffic_level_factor)
 ```
+
+<br>
+
 #### Model Evaluation – Radial SVM
 
-The confusion matrix for the radial SVM shows similar performance to the linear model.
+The confusion matrix for the radial SVM shows similar performance to the linear model. The overall accuracy is comparable to the linear model (with 83.16% even a bit worse). Also a similar confusion between `"moderate"` and `"high"` levels persists. This suggests that, while the radial kernel introduces nonlinear decision boundaries, it does **not significantly improve** classification performance in this case.
 
-**Observation:**
-- The overall accuracy is comparable to the linear model.
-- The same confusion between `"moderate"` and `"high"` levels persists.
-
-This suggests that, while the radial kernel introduces nonlinear decision boundaries, it does **not significantly improve** classification performance in this case.
+<br>
 
 #### Visualizing Decision Boundaries – Radial SVM
 
-We now plot the decision boundaries of the **radial SVM** using the same feature grid as before. Unlike the linear SVM, the radial kernel allows for **nonlinear and curved** boundaries.
-
-This helps us visually assess whether the model better separates overlapping classes.
+We now plot the decision boundaries of the **radial SVM** using the same feature grid as before. Unlike the linear SVM, the radial kernel allows for nonlinear and curved boundaries. This helps us visually assess whether the model better separates overlapping classes.
 
 ```{r, fig.align='center'}
 # Create prediction grid (as before)
@@ -1863,26 +1727,21 @@ ggplot() +
   theme_minimal()
 ```
 
+<br>
+
 #### Interpretation
 
-The decision boundaries created by the **radial kernel** are more flexible and curved compared to the linear model. However, there is still noticeable overlap between `"moderate"` and `"high"` traffic levels.
-
-This confirms what we observed in the confusion matrix: even with a nonlinear kernel, the model still struggles in this specific region of the feature space.
+The decision boundaries created by the radial kernel are more flexible and curved compared to the linear model. However, there is still noticeable overlap between `"moderate"` and `"high"` traffic levels. This confirms what we observed in the confusion matrix, even with a nonlinear kernel, the model still struggles in this specific region of the feature space.
 
 Next, we attempt to improve the model via **parameter tuning** using grid search and cross-validation.
 
 ### 3.4.5 SVM Parameter Tuning – Grid Search with Cross-Validation
 
-To potentially improve the model performance, we now perform a **grid search** for the optimal combination of `cost` and `gamma` values.
+To potentially improve the model performance, we now perform a **grid search** for the optimal combination of `cost` and `gamma` values. We use `e1071::tune()` with 10-fold cross-validation to evaluate combinations of `cost` [0.1, 1, 10, 100] and `gamma` [0.01, 0.05, 0.1, 0.5]. This process helps identify the parameter settings that yield the highest accuracy on the training data.
 
-We use `e1071::tune()` with 10-fold cross-validation to evaluate combinations of:
+Hyperparameter tuning was done on the SVM Model with the radial kernel since more hyperparameters can be tuned. By this we expect more possibilities to find a better performing model.
 
-- `cost`: 0.1, 1, 10, 100
-- `gamma`: 0.01, 0.05, 0.1, 0.5
-
-This process helps identify the parameter settings that yield the highest accuracy on the training data.
-
-```{r, cache = TRUE, eval=FALSE, collapse=TRUE}
+```{r, cache = TRUE, eval=TRUE, collapse=TRUE}
 set.seed(123)  # starting point pseudo randomness
 
 # Grid search using cross-validation
@@ -1900,14 +1759,16 @@ tuned_model <- tune(
 # Print summary of tuning results
 summary(tuned_model)
 ```
+
+<br>
+
 #### Tuning Results
 
-The output lists all combinations of `cost` and `gamma` along with their cross-validated accuracy.  
-The combination with the **highest accuracy** is automatically selected as the best model.
+The output lists all combinations of `cost` and `gamma` along with their cross-validated accuracy. The combination with the **highest accuracy** is automatically selected as the best model.
 
 We now extract this model and evaluate it on the **test dataset**.
 
-```{r, eval=FALSE}
+```{r, eval=TRUE, collapse=TRUE}
 # Extract best model
 best_model <- tuned_model$best.model
 
@@ -1918,35 +1779,199 @@ pred_tuned <- predict(best_model, newdata = test_svm)
 confusionMatrix(pred_tuned, test_svm$traffic_level_factor)
 ```
 
+<br>
+
 #### Final Evaluation – Tuned Radial SVM
 
-The confusion matrix for the best model shows that the **overall performance is very similar** to the untuned radial SVM.
+The confusion matrix for the best model shows that the **overall performance is similar** to the untuned radial SVM. We therefore conclude that there is no notable improvement through tuning. The initial radial model already performed well. Furthermore the confuction between `"moderate"` and `"high"` traffic levels remains the main source of error.
 
-**Conclusion:**
-
-- No notable improvement through tuning
-- The initial radial model already performed well
-- The confusion between `"moderate"` and `"high"` traffic levels remains the main source of error
-- This confirms that SVMs can be robust even with default or simple parameter choices
-
-In summary, the SVM models – particularly with the radial kernel – perform well in classifying traffic levels, though some overlaps between classes remain difficult to resolve with only two features.
+In summary, the SVM models perform well in classifying traffic levels (>80% accuracy, for both kernels), though some overlaps between classes remain difficult to resolve with only two features.
 
 
 ## 3.5 Neural Network
 
+In this chapter a simple neural network is used to predict `log_delivery_time`.
+
+The EDA points out not to use the `precipitation_mm` feature. `courier_age_years` and `courier_rating_1_to_5` are also not used as they are deemed to have poor predictive power on the delivery time. The features used in the model are: `temperature_celsius`, `humidity_percent`, `distance_km`, `order_type_factor`, `vehicle_type_factor`, `traffic_level_factor` and `weather_category`.
+
+### Processing
+
+```{r, neural_network_preprocessing}
+
+# Pre-process vehicle_type_factor
+df_clean_ann <- df_clean %>%
+  # Remove bicycle as only 10 observations
+  filter(vehicle_type_factor != "bicycle") %>%
+  mutate(vehicle_type_factor = factor(vehicle_type_factor))
+
+# Define predictors
+numeric_predictors <- c("temperature_celsius", "humidity_percent", "distance_km")
+categorical_predictors <- c("order_type_factor", "vehicle_type_factor",
+                            "traffic_level_factor", "weather_category")
+
+target_variable <- "log_delivery_time"
+```
+
+Firstly, the features and target are defined.
+
+```{r, neural_network_split_data}
+# Split data into train and test sets
+set.seed(42)
+indices <- createDataPartition(df_clean_ann[[target_variable]], p = 0.8, list = FALSE)
+train <- df_clean_ann[indices, ]
+test <- df_clean_ann[c(-indices), ]
+```
+
+The data set is split into 80% train and 20% test for more accurate evaluation.
+
+```{r, neural_network_scale_data}
+# Min-Max scale train set numeric predictors
+min_vals <- sapply(train[numeric_predictors], min)
+max_vals <- sapply(train[numeric_predictors], max)
+train_scaled_numeric <- as.data.frame(
+  mapply(function(x, minv, maxv) (x - minv) / (maxv - minv),
+         train[numeric_predictors], min_vals, max_vals)
+)
+
+# Use the same scaling for test set (based on train min/max)
+test_scaled_numeric <- as.data.frame(
+  mapply(function(x, minv, maxv) (x - minv) / (maxv - minv),
+         test[numeric_predictors], min_vals, max_vals)
+)
+
+# Scale target feature
+min_target <- sapply(train[target_variable], min)
+max_target <- sapply(train[target_variable], max)
+train_target_scaled <- as.data.frame(
+  mapply(function(x, minv, maxv) (x - minv) / (maxv - minv),
+         train[target_variable], min_target, max_target)
+)
+
+# Define formula for one-hot encoding
+dummy_formula <- as.formula(paste("~", paste(categorical_predictors, collapse = " + ")))
+
+# Fit encoder on training data
+dummies_model <- dummyVars(dummy_formula, data = train)
+
+# Apply to train and test
+train_encoded_categorical <- predict(dummies_model, newdata = train)
+test_encoded_categorical  <- predict(dummies_model, newdata = test)
+
+# Rename column names to remove "." which confuses neuralnet
+clean_names <- function(x) {
+  gsub("[^[:alnum:]_]", "_", x)  # Replace all non-alphanumeric chars with underscore
+}
+colnames(train_encoded_categorical) <- clean_names(colnames(train_encoded_categorical))
+colnames(test_encoded_categorical)  <- clean_names(colnames(test_encoded_categorical))
+
+# Combine new predictors and target
+processed_data <- cbind(train_scaled_numeric, train_encoded_categorical, train_target_scaled)
+```
+As for feature engineering, numerical predictors are min-max scaled to the range of [0,1] while the categorical features are one-hot encoded. The scaling is done as the features have different ranges and this could negatively impact on model convergence.
+
+<br>
+
+### Modelling
+
+```{r, neural_network_model}
+set.seed(42)
+delivery_time_model = neuralnet(log_delivery_time ~ temperature_celsius + humidity_percent +
+                         distance_km + order_type_factor_Buffet + order_type_factor_Drinks +
+                         order_type_factor_Meal + order_type_factor_Snack +
+                         vehicle_type_factor_electric_scooter + vehicle_type_factor_motorcycle + 
+                         vehicle_type_factor_scooter + traffic_level_factor_very_low + 
+                         traffic_level_factor_low + traffic_level_factor_moderate + 
+                         traffic_level_factor_high + traffic_level_factor_very_high + 
+                         weather_category_Clear + weather_category_Poor_Visibility + 
+                         weather_category_Rainy,
+                       data = processed_data, hidden = 3 , linear.output = TRUE)
+```
+The neuralnet package was used to model.
+
+<br>
+
+### Evaluation
+```{r, neural_network_evaluation, fig.align="center"}
+# Make predictions on test data
+pred_scaled <- compute(delivery_time_model, cbind(test_scaled_numeric, test_encoded_categorical))
+
+# Convert to minutes
+pred_original <- exp(pred_scaled$net.result * (max_target - min_target) + min_target)
+
+#Plot predicted vs. actual values
+plot(test$delivery_time_min, pred_original, col='blue', pch=16, ylab = "Predicted delivery time", xlab = "Actual delivery time")
+abline(0,1)
+
+# RMSE
+RMSE = sqrt(mean((test$delivery_time_min - pred_original)^2))
+
+# R-squared calculation
+ss_res <- sum((test$delivery_time_min - pred_original)^2)
+ss_tot <- sum((test$delivery_time_min - mean(test$delivery_time_min))^2)
+r_squared <- round(1 - (ss_res / ss_tot), 4)
+
+kable(data.frame(RMSE=RMSE, "R Squared" = r_squared), caption = "Neural network RMSE and R squared") %>% 
+  kable_styling(full_width = F) %>% 
+  column_spec(1, width ="4cm") %>% 
+  column_spec(2, width ="4cm")
+```
+
+* The model has an RMSE of approx. 5.4.
+
+* R squared is approx. 90% which is very good. This shows the features explain almost all the variance in the data.
+
+* The chart shows that predicted values have a strong relationship with actual values. The model is a little biased for high values and tends to underestimate the predictions.
+
+<br>
+
+### Interpretation
+```{r, neural_network_interpretation, fig.align="center"}
+plot(delivery_time_model, rep = "best")
+```
+
+As visible in the diagram above, the architecture of the model has 3 nodes in the hidden layer. In summary, the model performs very well in predicting the log delivery time. As it takes approx. 20 minutes to fit, cross validation and network architecture tuning were not carried out.
+
 
 # 4. Results and Discussion
 
-Presentation of model performances and comparison.
+Across all modeling approaches, we found that `distance_km` and `traffic_level_factor` were the most important predictors of delivery time, consistently contributing significant effects in linear, generalized linear, and GAM models. Log-transforming the delivery time improved model performance, especially for Generalized Additive Models.
+
+The linear model with interaction already explained a large portion of the variance (R² ~ 88%) and achieved the lowest RMSE (5.59 minutes) on the test set, making it the best-performing model in terms of prediction accuracy for delivery times in this project. The log-transformed GAM model produced comparable results, with a slightly higher R² (0.886) but a slightly higher RMSE (5.69 minutes).
+
+The Poisson regression successfully modeled delivery speeds and provided interpretable coefficients quantifying how traffic and weather affect courier speed. Additionally, the binomial model for classifying long deliveries showed very strong predictive power, achieving over 93% accuracy.
+
+The SVM classifier achieved good accuracy (~84%) in predicting traffic levels based on distance and average speed. However, distinguishing between "moderate" and "high" traffic levels remained challenging.
+
+Overall, our modeling results demonstrate that flexible approaches such as GAMs can provide valuable advantages for this type of data, especially when modeling potential nonlinear relationships and interactions — although, in this case, a well-tuned linear model with interaction terms provided the best predictive performance.
 
 # 5. Conclusion
 
-Interpretation of findings and implications.
+This project showed that machine learning models can effectively predict food delivery times by combining geographic, traffic, weather, and order-related data.
+
+We found that simple, well-designed models — especially linear models with interaction terms — already provide strong predictive performance. Generalized Additive Models (GAMs) added flexibility for modeling nonlinear effects, which could become even more useful in the case that data complexity increases.
+
+Distance and traffic level clearly emerged as being the most important factors influencing delivery time. The Poisson and binomial models also demonstrated how different modeling techniques can answer various business related questions, such as predicting delivery speeds or classifying long deliveries (e.g. to pick suitable packaging).
+
+Furthermore Support Vector Machines performed reasonably well for traffic classification, they were limited by feature overlap.
+
+In practice, models like these could help improve ETA accuracy, support better resource planning, and enhance customer experience. The interesting aspect of this group work was that in real life, we use applications that use ETA predictions (i.e. Uber Eats). It was therefore very interesting to see (in a limited and much easier setting) what is behind the ETA indication of such an app.
+
+Future work could include adding real-time data (e.g. live traffic), looking for more features (e.g. time of the day), or testing more advanced models.
 
 # 6 Chapter on AI 
 
-1- How did we use it? 
+In this project, we used AI tools (specifically ChatGPT) to support code revision and improvement during the development of our analysis.
 
-2- Where did we have to be careful etc. 
+For example we used ChatGPT for the following tasks:
+
+  - Refining code syntax and structure (e.g. improving clarity of ggplot visualizations)
+
+  - Debugging: when certain code chunks produced errors or warnings, we asked ChatGPT to help identify the issue and suggest corrections
+
+  - Improving explanations: we used AI to help rewrite parts of the text (e.g. model interpretation sections) to make them clearer and more consistent
+
+Throughout the project, we always double-checked any code or text we got from AI. We tested all suggestions first before adding them to our final version, and made sure that explanations matched our actual results.
+
+Overall, using AI was very helpful for improving our code and the report, but it was important to review everything carefully and make sure it really fit with what we had done and understood.
 
 # References
