@@ -135,7 +135,7 @@ To narrow the data set to the relevant geographic area, we applied a filter to r
 
 To visualize the geographic distribution of these observations, we first defined the map boundaries using the data set’s minimum and maximum latitude and longitude values. These coordinates were converted into a simple feature object representing the corners of the bounding box. This object was then used to download map tiles corresponding to the area of interest, enabling accurate spatial visualization.
 
-Figure 1 displays all restaurant and delivery locations overlaid on the background map defined by bounding box. The plotted points indicate that the observations were collected from 22 cities across India, including major urban centers such as New Delhi, Mumbai, Bangalore, Kolkata, and Chennai.
+The Figure "Restaurant and Delivery Locations" displays all restaurant and delivery locations overlaid on the background map defined by bounding box. The plotted points indicate that the observations were collected from 22 cities across India, including major urban centers such as New Delhi, Mumbai, Bangalore, Kolkata, and Chennai.
 
 
 ```{r geographic_filtering, fig.height=4, fig.align='center', warning=FALSE, message=FALSE, exec = FALSE}
@@ -166,7 +166,7 @@ example.map <- get_tiles(bbox.sf, provider = "OpenStreetMap")
 # Extract bounding box limits
 bbox.limits <- st_bbox(bbox.sf)
 
-# Figure 1: Plot restaurant and delivery locations on the map
+# Figure : Plot restaurant and delivery locations on the map
 ggplot() +
   layer_spatial(data = example.map) +
   geom_point(data = df.food_time.clean,
@@ -212,6 +212,9 @@ A binary variable `long_delivery_flag` was created to indicate whether a deliver
 
 - Average Speed Calculation:
 Delivery speed `average_speed_kmph` was computed in kilometers per hour by dividing distance by delivery time, and then converting to an integer. This variable serves as the target for the Poisson model. 
+
+- Unnecessary Column Removal:
+All columns that are neither continuous nor factor variables have been removed from the dataset.
 
 - Missing Data Removal:
 All rows containing missing values after the above transformations were dropped to ensure data quality.
@@ -299,7 +302,20 @@ p2 <- ggplot(df_clean, aes(y = delivery_time_min)) +
 p1 + p2
 
 # Summary
-summary(df_clean$delivery_time_min)
+#summary(df_clean$delivery_time_min)
+# Step 1: Get summary
+summary_stats <- summary(df_clean$delivery_time_min)
+
+# Step 2: Convert to data frame (1 row, 6 columns)
+summary_df <- as.data.frame(t(as.matrix(summary_stats)))
+
+# Step 3: Rename columns
+colnames(summary_df) <- c("Min.", "1st Qu.", "Median", "Mean", "3rd Qu.", "Max")
+
+# Step 4: Show as kableExtra table
+summary_df %>%
+  kbl(caption = "Summary Statistics for Delivery Time [min]", digits = 2, align = "c") %>%
+  kable_styling(position = "center", full_width = T)
 ```
 
 What we can see from looking at the above plots of our target variable is that the distribution seems right-skewed. This can be seen on the histogram itself (flattening more slowly to the right) as well as in the boxplot (many outliers above the upper whisker).
@@ -333,7 +349,20 @@ p4 <- ggplot(df_clean, aes(y = log_delivery_time)) +
 p3 + p4
 
 # Summary
-summary(df_clean$log_delivery_time)
+#summary(df_clean$log_delivery_time)
+# Extract and format summary
+log_summary <- summary(df_clean$log_delivery_time)
+
+# Convert to 1-row data frame
+log_summary_df <- as.data.frame(t(as.matrix(log_summary)))
+
+# Rename columns
+colnames(log_summary_df) <- c("Min.", "1st Qu.", "Median", "Mean", "3rd Qu.", "Max")
+
+# Display with kableExtra
+log_summary_df %>%
+  kbl(caption = "Summary Statistics for Log-Transformed Delivery Time", digits = 3, align = "c") %>%
+  kable_styling(position = "center", full_width = T, bootstrap_options = c("striped", "condensed", "hover"))
 ```
 
 After log-transforming our target variable, the distribution looks more symmetrical. The boxplot looks more compact and has less outliers above the upper whisker. Furthermore, we can see that mean and median are closer to each other.
@@ -673,8 +702,18 @@ A comparison of the Coefficient estimates between `lm.delivery1` and `lm.deliver
 To compare the two models, we use the Akaike Information Criterion (AIC). Lower values indicate a better trade-off between fit and complexity.
 
 ```{r}
-AIC(lm.delivery1)
-AIC(lm.delivery2)
+#AIC(lm.delivery1)
+#AIC(lm.delivery2)
+# Create a data frame with model names and AIC values
+aic_table <- data.frame(
+  Model = c("Model 1", "Model 2"),
+  AIC = c(AIC(lm.delivery1), AIC(lm.delivery2))
+)
+
+# Display the table centered
+aic_table %>%
+  kbl(caption = "AIC Comparison of Model 1 and Model 2", align = "c") %>%
+  kable_styling(position = "center")
 ```
 
 Finally, the AIC values of both models are nearly identical, again supporting the simplification. We conclude, that the model can be reduced without losing explanatory information by removing `courier_rating_1_to_5`.
@@ -687,7 +726,14 @@ In the next step, we explore whether an interaction exists between `distance_km`
 We therefore fit a third model including the interaction term (see code chunk below).
 
 ```{r}
-log_delivery_time ~ distance_km * traffic_level_factor + order_type_factor
+#log_delivery_time ~ distance_km * traffic_level_factor + order_type_factor
+formulas <- data.frame(
+  Model = c("Interaction Model"),
+  Formula = c("log_delivery_time ~ distance_km * traffic_level_factor + order_type_factor")
+)
+
+kbl(formulas, caption = "Model Formula", align = "l") %>%
+  kable_styling(position = "center", full_width = T)
 ```
 
 This model includes the main effects of `distance_km`, `traffic_level_factor`, and `order_type_factor` as well as all interaction terms between `distance_km` and `traffic_level_factor`.
@@ -709,8 +755,19 @@ To formally compare both models, We use both the Akaike Information Criterion (A
 #### AIC comparison
 ```{r}
 # Compare AIC values
-AIC(lm.delivery2)
-AIC(lm.interaction)
+#AIC(lm.delivery2)
+#AIC(lm.interaction)
+
+# Create a data frame with model names and AIC values
+aic_table2 <- data.frame(
+  Model = c("Model: delivery2", "Model: interaction"),
+  AIC = c(AIC(lm.delivery2), AIC(lm.interaction))
+)
+
+# Display the table centered
+aic_table2 %>%
+  kbl(caption = "AIC Comparison: delivery2 vs interaction", align = "c") %>%
+  kable_styling(position = "center")
 ```
 
 The AIC for `lm.interaction` is lower than for `lm.delivery2`, indicating a better fit despite the increased complexity.
@@ -720,7 +777,26 @@ The AIC for `lm.interaction` is lower than for `lm.delivery2`, indicating a bett
 #### ANOVA comparison
 ```{r}
 # anova to compare models
-anova(lm.delivery2, lm.interaction)
+#anova(lm.delivery2, lm.interaction)
+
+# Perform ANOVA and convert result to a tidy data frame
+anova_results <- anova(lm.delivery2, lm.interaction)
+anova_df <- tidy(anova_results)
+
+# Replace model formulas with simple names
+anova_df$term <- c("delivery2", "interaction")
+colnames(anova_df)[colnames(anova_df) == "term"] <- "Model"
+
+# Display in styled kableExtra table
+anova_df %>%
+  kbl(
+    caption = "ANOVA Comparison: delivery2 vs interaction",
+    digits = 4,
+    align = "c"
+  ) %>%
+  kable_styling(position = "center", full_width = TRUE, bootstrap_options = c("striped", "condensed", "hover"))
+
+
 ```
 The ANOVA test shows a significant reduction in the residual sum of squares when moving from the simpler model to the interaction model. The F-statistic is high and the corresponding p-value is very small.
 
@@ -781,7 +857,18 @@ r_squared <- 1 - sum((predicted_min - actual_min)^2) / sum((actual_min - mean(ac
 results <- data.frame(predicted_min = predicted_min, actual_min = actual_min)
 short_deliveries <- results[results$actual_min < 40, ]
 rmse_short <- sqrt(mean((short_deliveries$predicted_min - short_deliveries$actual_min)^2))
-rmse_short
+#rmse_short
+
+# Create summary table
+metrics <- data.frame(
+  Metric = "RMSE (short deliveries < 40 min)",
+  Value = rmse_short
+)
+
+# Display as kableExtra table
+metrics %>%
+  kbl(caption = "Model Performance Metrics", digits = 4, align = "c") %>%
+  kable_styling(position = "center")
 ```
 We observe that for deliveries under 40 minutes, the predicted values are very close to the actual ones. The model performs well in this range. For longer delivery times (above 50 minutes), the variance increases and the predictions become less precise. A few, rather extreme outliers are present for very long delivery times. Overall, the predicted vs. actual relationship appears approximately linear, and the model performs robustly.
 
@@ -829,8 +916,7 @@ Overall, the second Poisson model is more parsimonious and performs better based
  
 
 ```{r, poisson_m2, collapse=TRUE}
-# check traffic_level_factor
-table(df_clean$traffic_level_factor, useNA = "always")
+
 # Refine the Poisson regression by removing unnecessary variables.
 # regression with glm poisson model
 poisson.model <- glm(
@@ -907,7 +993,7 @@ coef_table <- data.frame(
 
 # Display as a kable table
 kable(coef_table, caption = "Poisson Regression Coefficients and IRRs") %>% 
-  kable_styling(full_width = F) %>% 
+  kable_styling(full_width = TRUE) %>% 
   column_spec(1, width ="4cm") %>% 
   column_spec(2, width ="4cm")
 
@@ -1033,9 +1119,13 @@ overdisp_table <- data.frame(
   }
 )
 
-# Print as a styled table
-kable(overdisp_table, caption = "Overdispersion Check Result") %>%
-  kable_styling(full_width = FALSE, position = "left") %>%
+# display the values in kable table
+kable(overdisp_table, caption = "Overdispersion Check Result", align = "c") %>%
+  kable_styling(
+    full_width = TRUE,
+    position = "center",  # <-- centers the table
+    bootstrap_options = c("striped", "hover", "condensed")
+  ) %>%
   column_spec(1, bold = TRUE)
 ```
 ### 3.2.2 Binomial Regression
@@ -1088,7 +1178,25 @@ It turns out that certain classes of `traffic_level_factor` perfectly estimate `
 
 ```{r}
 # Complete separation occurs with traffic_level_factor
-table(df_clean_binomial$long_delivery_flag, df_clean_binomial$traffic_level_factor)
+#table(df_clean_binomial$long_delivery_flag, df_clean_binomial$traffic_level_factor)
+# Create the contingency table
+contingency_tbl <- table(df_clean_binomial$long_delivery_flag, df_clean_binomial$traffic_level_factor)
+
+# Convert to data frame
+contingency_df <- as.data.frame.matrix(contingency_tbl)
+
+# Add row names as a column
+contingency_df <- cbind("Long Delivery Flag" = rownames(contingency_df), contingency_df)
+rownames(contingency_df) <- NULL
+
+# Display as a kableExtra table
+contingency_df %>%
+  kbl(
+    caption = "Contingency Table: Long Delivery Flag vs. Traffic Level Factor",
+    align = "c"
+  ) %>%
+  kable_styling(position = "center", full_width = TRUE, bootstrap_options = c("striped", "hover", "condensed"))
+
 ```
 
 This is problematic as it means that the maximum likelihood estimate (MLE) for the coefficients corresponding to the factor levels of `traffic_level_factor` does not exist and the model fails to converge. As a result, the interpretation of coefficients becomes unstable and meaningless. I decided to progress with a more robust solution: Firth’s correction (bias-reduced logistic regression) implemented with the `brglm2::brglmFit` method.
@@ -1146,11 +1254,28 @@ test_data <- test_data %>%
   mutate(y_pred = if_else(y_pred > 0.5, 1, 0))
 
 # Confusion matrix
-table(Predicted = test_data$y_pred, Actual = test_data$long_delivery_flag)
+#table(Predicted = test_data$y_pred, Actual = test_data$long_delivery_flag)
+# Create confusion matrix and convert to data frame
+conf_matrix <- table(Predicted = test_data$y_pred, Actual = test_data$long_delivery_flag)
+conf_df <- as.data.frame.matrix(conf_matrix)
+conf_df <- cbind("Predicted" = rownames(conf_df), conf_df)
+rownames(conf_df) <- NULL
 
 # Accuracy
-mean(test_data$y_pred == test_data$long_delivery_flag)
+#mean(test_data$y_pred == test_data$long_delivery_flag)
+accuracy <- mean(test_data$y_pred == test_data$long_delivery_flag)
+
+# Display confusion matrix
+conf_df %>%
+  kbl(caption = "Confusion Matrix", align = "c") %>%
+  kable_styling(position = "center", full_width = TRUE, bootstrap_options = c("striped", "condensed", "hover"))
+
+# Display accuracy
+data.frame(Accuracy = round(accuracy, 4)) %>%
+  kbl(caption = "Model Accuracy", align = "c") %>%
+  kable_styling(position = "center", full_width = TRUE)
 ```
+
 
 The accuracy of the model (with threshold = 0.5) is 93.2% which is very good. 54 deliveries that were shorter than 40 minutes were misclassified as longer than and 69 of deliveries that were longer than 40 minutes were misclassified as shorter than. This corresponds to a specificity of 94.9% and sensitivity of 90.7%. Furthermore, when the model predicts a short delivery, it has 93.6% probability of being correct (negative predictive value) and when it predicts a long delivery, it has a 92.6% probability of being correct.
 
@@ -1161,7 +1286,6 @@ The accuracy of the model (with threshold = 0.5) is 93.2% which is very good. 54
 The estimated model,expressed in its exponentiated form, is:
 
 $$
-
 \begin{aligned}
 \text{long_delivery_flag} = \exp(&\, -16.381 
 + 0.084 \cdot \text{temperature_celsius} \\
@@ -1176,7 +1300,6 @@ $$
 &+ 0.448 \cdot \text{weather_category}_{\text{Poor Visibility}}
 + 1.105 \cdot \text{weather_category}_{\text{Rainy}})
 \end{aligned}
-
 \
 $$
 As for the interpretation of these coefficients:
@@ -1216,17 +1339,17 @@ P = e^{7.51433} \approx 1,834 \text{ times}
 
 ## 3.3. Generalised Additive Models (GAM) 
 
-After analyzing the linear model and the generalized linear model (GLM), we will now explore a more flexible and potentially more powerful approach: the Generalized Additive Model (GAM). Our goal is to improve the prediction of the target variable — `delivery_time_min`. As before, we will use the `df_clean` data.frame, which has been cleaned and preprocessed from the raw data. The `gam()` function is found in the `{mgcv}` package. 
+After analyzing the linear model and the generalized linear model (GLM), we will now explore a more flexible and potentially more powerful approach: the Generalized Additive Model (GAM). Our goal is to improve the prediction of the target variable — `delivery_time_min`.  
 
 ### 3.3.1 Modeling
 
-In GAM modeling, several options can be incorporated into the model: the smoother `s()` function can be applied to continuous variables, and interactions between variables can also be considered. In the linear model, the target variable `delivery_time_min` was log-transformed. Therefore, in the GAM models, both the original and log-transformed versions of the target variable will be compared in terms of their outcomes. Due to space limitations in this document, only three selected models are presented in this chapter, and their results are compared.
+In GAM modeling, several options can be incorporated into the model: the smoother `s()` function can be applied to continuous variables, and interactions between variables can also be considered. In the linear model, the target variable `delivery_time_min` was log-transformed. Therefore, in the GAM models, both the original and log-transformed versions of the target variable will be compared in terms of their outcomes. Due to space limitations in this document, only selected models are presented in this chapter, and their results are compared.
 
 **Gam model 1**
 
 First, all continuous and categorical variables are included in an initial GAM to examine their p-values and assess which variables significantly contribute to the model and which do not. The model summary is obtained using `summary(gam.model.test1)`. Since no smooth functions s() are included in `gam.model.test1`, it is equivalent to a linear model. 
 
-The first round of results results in an adjusted R-squared of 0.858. The statistically significant predictors, marked with '***', include the `Intercept`, `temperature_celsius`, `humidity_percent`, `distance_km`, and `traffic_level_factor`, suggesting they have a meaningful impact on delivery time. In contrast, variables such as `courier_age_years`, `precipitation_mm`, `vehicle_type_factor`, and `weather_category` have p-values greater than 0.05 and therefore do not significantly contribute to the model. These non-significant variables will be excluded in the next modeling steps. 
+The first round of results results in an adjusted R-squared of 0.858. The statistically significant predictors, include the `Intercept`, `temperature_celsius`, `humidity_percent`, `distance_km`, and `traffic_level_factor`, suggesting they have a meaningful impact on delivery time. In contrast, variables such as `courier_age_years`, `precipitation_mm`, `vehicle_type_factor`, and `weather_category` have p-values greater than 0.05 and therefore do not significantly contribute to the model. These non-significant variables will be excluded in the next modeling steps. 
 
 ```{r, GAM_model_1, warning=FALSE, message=FALSE, collapse=TRUE}
 
@@ -1237,7 +1360,7 @@ gam.model.test1 <- gam(delivery_time_min ~ courier_age_years + temperature_celsi
           data = df_clean)
 summary(gam.model.test1)
 ```
-**Gam model 2, integrate smoother and interactions**
+**Gam model 2, integrate smoother**
 
 In the second attempt, we include only the statistically significant variables identified previously. Additionally, we apply the `s()` function to all continuous variables — `temperature_celsius`, `humidity_percent`, and `distance_km` — to allow for flexible, non-linear relationships using smooth terms. To avoid overfitting, we use `bs = "cs"` (cubic regression splines with shrinkage), and set `k = 5` to limit the maximum allowable complexity for each smooth term.
 
@@ -1277,7 +1400,7 @@ anova_table <- data.frame(
 
 # Display the ANOVA comparison table
 kable(anova_table, digits = 2, align = 'c', caption = "ANOVA Comparison: gam.model.test1 vs gam.model.test2") %>%
-  kable_styling(full_width = FALSE, position = "center", bootstrap_options = c("striped", "hover", "condensed")) %>%
+  kable_styling(full_width = TRUE, position = "center", bootstrap_options = c("striped", "hover", "condensed")) %>%
   column_spec(1, width = "4cm") %>%
   column_spec(2:7, width = "2.5cm")
 
@@ -1297,7 +1420,7 @@ model_comparison <- data.frame(
 
 # Display the model comparison table
 kable(model_comparison, digits = 2, align = 'c', caption = "Model Comparison: gam.model.test1 vs gam.model.test2") %>%
-  kable_styling(full_width = FALSE, position = "center", bootstrap_options = c("striped", "hover", "condensed")) %>%
+  kable_styling(full_width = TRUE, position = "center", bootstrap_options = c("striped", "hover", "condensed")) %>%
   column_spec(1, width = "4cm") %>%
   column_spec(2:5, width = "2.5cm")
 ```
@@ -1308,21 +1431,12 @@ kable(model_comparison, digits = 2, align = 'c', caption = "Model Comparison: ga
 
 In the next step, interactions between predictors will be analyzed and selected for modeling. After testing several trial models, we compare two interaction candidates to evaluate their improvement over the existing model, `gam.model.test2`. The interactions `temperature_celsius:humidity_percent` and `distance_km:traffic_level_factor` are included in `gam.model.test6`, while only `temperature_celsius:humidity_percent` is included in `gam.model.test8`. Their performance is compared using the same criteria: anova(), AIC, and GCV values.
 
-Two generalized additive models (GAMs) were compared to assess the effect of including interaction terms. `gam.model.test6` includes both interactions `temperature_celsius: humidity_percent` and `distance_km:traffic_level_factor`, while `gam.model.test8` includes only the first interaction.
-
 `gam.model.test6` has a slightly lower AIC (57247.91 vs. 57264.50) and marginally better GCV (33.05 vs. 33.12), indicating a minor improvement in model fit. Both models achieve the same R² value of 0.88, suggesting equal explanatory power.
 
 The interaction `temperature_celsius:humidity_percent` is statistically significant (p < 0.001) and suggests that higher temperature combined with higher humidity slightly decreases delivery time.
 
 All interaction terms involving `distance_km:traffic_level_factor` in `gam.model.test6` are not statistically significant (p > 0.23), implying they do not contribute meaningful information.
-
-Smooth term plots are consistent across models: temperature and humidity show modest nonlinear effects, while distance has a stronger positive effect in `gam.model.test8`.
-
-Although `gam.model.test6` fits slightly better, the improvement is minimal, and the added complexity from the insignificant `distance_km:traffic_level_factor` interaction is not justified.
-
-Therefore, `gam.model.test8` is preferable for its simplicity and comparable performance. It retains the significant interaction and avoids unnecessary terms that may lead to overfitting.
-
-```{r, GAM_model_3, collapse=TRUE, out.width = "100%", fig.height = 2}
+```{r GAM_model_3_1, collapse=TRUE, out.width = "100%", fig.height = 2}
 # 6th fitting, include recommended interations to the GAM with shrinkage of cyclic spline
 gam.model.test6 <- gam(delivery_time_min ~ s(temperature_celsius, bs = "cs", k=5) + 
                                            s(humidity_percent, bs = "cs", k=5) + 
@@ -1333,16 +1447,7 @@ gam.model.test6 <- gam(delivery_time_min ~ s(temperature_celsius, bs = "cs", k=5
                                            distance_km:traffic_level_factor,
                                            data = df_clean)
 summary(gam.model.test6)
-#  visualize the smooth terms, Plot all smooth terms with confidence intervals 
-# Set layout to 1 row, 3 columns
-par(mfrow = c(1, 3))
 
-# Plot each smooth term individually
-plot(gam.model.test6, select = 1, se = TRUE, rug = TRUE, main = "Test6: Temperature Smooth Term")
-plot(gam.model.test6, select = 2, se = TRUE, rug = TRUE, main = "Test6: Humidity Smooth Term")
-plot(gam.model.test6, select = 3, se = TRUE, rug = TRUE, main = "Test6: Distance Smooth Term")
-
-#plot(gam.model.test6, pages = 1, se = TRUE, rug = TRUE, main="Smooth Terms of GAM Model Test 6")
 
 # 8th continue after 6th, remove insignificant variables
 gam.model.test8 <- gam(delivery_time_min ~ s(temperature_celsius, bs = "cs", k=5) + 
@@ -1353,14 +1458,6 @@ gam.model.test8 <- gam(delivery_time_min ~ s(temperature_celsius, bs = "cs", k=5
                          temperature_celsius:humidity_percent,
                        data = df_clean)
 summary(gam.model.test8)
-#  visualize the smooth terms, Plot all smooth terms with confidence intervals 
-#plot(gam.model.test8, pages = 1, se = TRUE, rug = TRUE, main="Smooth Terms of GAM Model Test 8")
-
-
-# Plot each smooth term individually
-plot(gam.model.test8, select = 1, se = TRUE, rug = TRUE, main = "Test8: Temperature Smooth Term")
-plot(gam.model.test8, select = 2, se = TRUE, rug = TRUE, main = "Test8: Humidity Smooth Term")
-plot(gam.model.test8, select = 3, se = TRUE, rug = TRUE, main = "Test8: Distance Smooth Term")
 
 # model comparing test1 and test2
 anova(gam.model.test6, gam.model.test8, test = "F")
@@ -1378,10 +1475,40 @@ model_comparison <- data.frame(
 # Print the table
 kable(model_comparison, digits = 2, align = 'c', caption = "Model Comparison: gam.model.test6 vs gam.model.test8") %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), 
-                full_width = FALSE, 
+                full_width = T, 
                 position = "center") %>%
   column_spec(1, width = "5cm") %>%
   column_spec(2:4, width = "3cm")
+```
+
+Smooth term plots are consistent across models: temperature and humidity show modest nonlinear effects, while distance has a stronger positive effect in `gam.model.test8`.
+
+Although `gam.model.test6` fits slightly better, the improvement is minimal, and the added complexity from the insignificant `distance_km:traffic_level_factor` interaction is not justified.
+
+Therefore, `gam.model.test8` is preferable for its simplicity and comparable performance. It retains the significant interaction and avoids unnecessary terms that may lead to overfitting.
+
+```{r, GAM_model_3_2, collapse=TRUE, out.width = "100%", fig.height = 2}
+#  visualize the smooth terms, Plot all smooth terms with confidence intervals 
+# Set layout to 1 row, 3 columns
+par(mfrow = c(1, 3))
+
+# Plot each smooth term individually
+plot(gam.model.test6, select = 1, se = TRUE, rug = TRUE, main = "Test6: Temperature Smooth Term")
+plot(gam.model.test6, select = 2, se = TRUE, rug = TRUE, main = "Test6: Humidity Smooth Term")
+plot(gam.model.test6, select = 3, se = TRUE, rug = TRUE, main = "Test6: Distance Smooth Term")
+
+#plot(gam.model.test6, pages = 1, se = TRUE, rug = TRUE, main="Smooth Terms of GAM Model Test 6")
+
+#  visualize the smooth terms, Plot all smooth terms with confidence intervals 
+#plot(gam.model.test8, pages = 1, se = TRUE, rug = TRUE, main="Smooth Terms of GAM Model Test 8")
+
+
+# Plot each smooth term individually
+plot(gam.model.test8, select = 1, se = TRUE, rug = TRUE, main = "Test8: Temperature Smooth Term")
+plot(gam.model.test8, select = 2, se = TRUE, rug = TRUE, main = "Test8: Humidity Smooth Term")
+plot(gam.model.test8, select = 3, se = TRUE, rug = TRUE, main = "Test8: Distance Smooth Term")
+
+
 ```
 
 **Gam model 4, integrate log transformation on target variable**
@@ -1501,7 +1628,7 @@ model_comparison <- data.frame(
 # Display the table using kableExtra
 model_comparison %>%
   kbl(caption = "Model Comparison Table", digits = 3, align = "lcc") %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = F)
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"), full_width = TRUE)
 ```
 
 **Visualization of Model Residuals and Predictions**
@@ -1933,7 +2060,7 @@ ss_tot <- sum((test$delivery_time_min - mean(test$delivery_time_min))^2)
 r_squared <- round(1 - (ss_res / ss_tot), 4)
 
 kable(data.frame(RMSE=RMSE, "R Squared" = r_squared), caption = "Neural network RMSE and R squared") %>% 
-  kable_styling(full_width = F) %>% 
+  kable_styling(full_width = T) %>% 
   column_spec(1, width ="4cm") %>% 
   column_spec(2, width ="4cm")
 ```
