@@ -1,27 +1,15 @@
 # ML1 Project
 # Modelling-Food-Delivery-Time
-
-- Project deadline: on June 13th 2025 5pm.
-
-### Team Members & Contributions
-
-- **Krzysztof Baran:** GLM (family = Binomial), Artificial neural network  
-- **Curdin Caderas:** Linear model, Support Vector Machine  
-- **Wenxing Xu:** GLM (family = Poisson), Generalized Additive Models  
-
 ---
+Submission for Machine Learning 1 project.
 
-### Message:
+In this project we modeled food delivery time (among others) using these models:
 
-Hi,  
-
-We are happy to submit our ML1 project. Please use `Food_Time_Data_Set.csv` as the raw data.  
-
-The dataset can be found in folder `data/`. The folder `docs/` contains the `.Rmd` file as well as the HTML file.  
-
-Thanks & kind regards,  
-
-Wenxing, Krzysztof and Curdin
+- Linear model - Curdin Caderas
+- Generalized Linear models - Poisson: Wenxing Xu / Binomial: Krzysztof Baran
+- Generalized Additive model - Wenxing Xu
+- Support Vector machine - Curdin Caderas
+- Artificial neural network - Krzysztof Baran
 
 ---
 
