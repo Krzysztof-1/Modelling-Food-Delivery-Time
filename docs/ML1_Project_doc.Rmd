@@ -31,13 +31,14 @@ The primary objective of this project is to build predictive models that accurat
 
 Accurate delivery time predictions can significantly enhance operational efficiency for food delivery platforms. From optimizing route planning to improving user experience through reliable ETAs, these models have practical implications for both logistics teams and end customers. Moreover, the insights gained from the modeling process can inform strategic decisions such as resource allocation, staffing during peak hours, and pricing policies.
 
+
 # 2. Data Description
 
 ## 2.1 Data Source
-The dataset used in this project originates from a real-world scenario involving food delivery logistics. It is publicly available on Kaggle @gibin2023food. This dataset captures a diverse and comprehensive set of variables related to food delivery orders, making it an ideal candidate for exploring machine learning approaches to predict delivery times.
+The data set used in this project originates from a real-world scenario involving food delivery logistics. It is publicly available on Kaggle @gibin2023food. This data set captures a diverse and comprehensive set of variables related to food delivery orders, making it an ideal candidate for exploring machine learning approaches to predict delivery times.
 
-**Dataset Overview**
-The dataset contains 10,001 delivery records, each representing a unique food delivery transaction. These records encompass various dimensions of the delivery process, including geographic information, courier characteristics, weather and traffic conditions, and order-specific features. The data schema is outlined as follows:
+**Data Set Overview**
+The data set contains 10,001 delivery records, each representing a unique food delivery transaction. These records encompass various dimensions of the delivery process, including geographic information, courier characteristics, weather and traffic conditions, and order-specific features. The data schema is outlined as follows:
 
 - **ID**: A unique identifier for each delivery instance.
 
@@ -138,7 +139,7 @@ To visualize the geographic distribution of these observations, we first defined
 The Figure "Restaurant and Delivery Locations" displays all restaurant and delivery locations overlaid on the background map defined by bounding box. The plotted points indicate that the observations were collected from 22 cities across India, including major urban centers such as New Delhi, Mumbai, Bangalore, Kolkata, and Chennai.
 
 
-```{r geographic_filtering, fig.height=4, fig.align='center', warning=FALSE, message=FALSE, exec = FALSE}
+```{r geographic_filtering, fig.height=2.5, fig.align='center', warning=FALSE, message=FALSE, exec = FALSE}
 # Clean the data by filtering for geographic coordinates
 df.food_time.clean <- df.food_time %>%
   filter(
@@ -285,7 +286,7 @@ head(df_clean)
 To start the EDA we will look at the distribution of our (main) target variable: `delivery_time_min`.
 In order to do this we create a histogram and a boxplot. Furthermore, we look at the summary of this column. 
 
-```{r delivery_time_eda, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
+```{r delivery_time_eda, fig.width=8, fig.height=3, message=FALSE, warning=FALSE}
 # Create histogram of target variable "Delivery Time [min]"
 p1 <- ggplot(df_clean, aes(x = delivery_time_min)) +
   geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
@@ -329,7 +330,7 @@ In addition to our observations, we know that time is considered an "amount". Du
 
 Following the aforementioned points, in the next step we log-transform our target variable into `log_delivery_time` and include it in the dataframe `df_cleaned`. To verify the log-transformation we will create the same plots and output as for the original target variable.
 
-```{r log_delivery_time_eda, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
+```{r log_delivery_time_eda, fig.width=8, fig.height=3, message=FALSE, warning=FALSE}
 # Add log transformed delivery time to df_clean
 df_clean$log_delivery_time <- log(df_clean$delivery_time_min)
 
@@ -404,7 +405,6 @@ Looking at the different distributions we observe the following:
 
 - **precipitation_mm:** Many zero values which leads us to believe that there could be an error in the data. We will not use this predictor for further analysis.
 
-
 In the next step we will investigate the numeric predictors further by looking at scatter plots of each numeric predictor on the (log-transformed) target variable.
 
 ```{r predictor_scatterplots, fig.width=12, fig.height=8, message=FALSE, warning=FALSE}
@@ -445,7 +445,6 @@ From looking at the plots, the correlation line and Pearson's r, we observe the 
 - **humidity_percent:** There is essentially no correlation between humidity and delivery time (r = - 0.02, scattered points around flat line).
 
 Among all numeric predictors, only `distance_km` shows a strong (positive) linear relationship with the log-transformed delivery time. All other variables exhibit weak to negligible correlations.
-
 
 For out categorical predictors we start by investigating the counts in each category.
 ```{r predictor_bar_charts, fig.width=12, fig.height=10, message=FALSE, warning=FALSE}
@@ -490,8 +489,6 @@ From the bar charts above, we observe the following:
 
 - **weather_category:** Most deliveries happen in clear weather, while poor visibility and rain occur less often. 
 
-
-
 After looking at the counts of the categorical variables, we now look at the log-transformed delivery time versus our categorical variables using boxplots.
 
 ```{r predictor_boxplots, fig.width=12, fig.height=14, message=FALSE, warning=FALSE}
@@ -532,7 +529,7 @@ By visually inspecting the box plots we can make the following observations:
 
 Since we have observed that traffic level seems to have a big impact, we will investigate this further by creating a scatter plot of (log-transformed) delivery time against distance.
 
-```{r distance_log_time_traffic_level, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
+```{r distance_log_time_traffic_level, fig.width=8, fig.height=3, message=FALSE, warning=FALSE}
 # Create scatter on distance and time (log) with traffic level in colors
 ggplot(df_clean, aes(x = distance_km, y = log_delivery_time, color = traffic_level_factor)) +
   geom_point(alpha = 0.5) +
@@ -548,7 +545,7 @@ ggplot(df_clean, aes(x = distance_km, y = log_delivery_time, color = traffic_lev
 From the plot above we can see that the same delivery distances take longer under heavier traffic conditions. This is a **hint for an interaction between `distance_km` and `traffic_level_factor`**.
 
 
-```{r ggpairs, fig.width=12, fig.height=5, message=FALSE, warning=FALSE}
+```{r ggpairs, fig.width=8, fig.height=4, message=FALSE, warning=FALSE}
 
 # Create scatter plot matrix using ggpairs
 selected_cols <- c("courier_age_years",
@@ -563,16 +560,15 @@ ggpairs(df_clean[, selected_cols])
 
 As the above pairs plot displays no strong relationships between the continuous predictors and since all of the Pearson's correlation coefficients are low, we can conclude that no more interactions need to be included in the model.
 
-
 # 3. Models
 
-The following chapter contains all the models which we fitted for our dataset.
+The following chapter contains all the models which we fitted for our data set.
 
 ## 3.1 Linear Model
 
-After investigating both numerical and categorical variables, we now begin fitting linear regression models. Our target variable is Delivery Time in minutes. For modeling purposes, we apply a log-transformation to the target variable (see EDA section for justification).
+After investigating both numerical and categorical variables, we now begin fitting linear regression models. Our target variable is delivery time in minutes. For modeling purposes, we apply a log-transformation to the target variable (see EDA section for justification).
 
-Before fitting the first model, we need to split the data into training and test sets. We do this using stratified sampling based on the factor `traffic_level_factor`. This because, during EDA we observed an imbalance in the `traffic_level_factor`, and it appeared to be a strong predictor. Therefore, stratified sampling ensures that this imbalance is proportionally reflected in both the training and test datasets.
+Before fitting the first model, we need to split the data into training and test sets. We do this using stratified sampling based on the factor `traffic_level_factor`. This is done because, during EDA we observed an imbalance in the `traffic_level_factor`, and it appeared to be a strong predictor. Stratified sampling ensures that this imbalance is proportionally reflected in both the training and test data sets.
 
 ```{r}
 set.seed(42) # starting point for pseudo randomness
@@ -615,19 +611,19 @@ There is strong evidence that the slope of `distance_km` is not zero. Each addit
 
 There is **no significant effect** of the `courier_rating_1_to_5` on the delivery time. The p-value is 0.242 (>> 0.05) and the 95% confidence interval includes 0 ([-0.0151, 0.0038]). Therefore, we will consider removing this variable in the next step.
 
-For `traffic_level_factor` "very low"` represents the reference level. All other levels show highly significant positive coefficients, indicating longer delivery times with increasing traffic. As an example, the coefficient of traffic level "very high" is 1.219. The exponent of 1.219 is 3.38, which means that deliveries under very high traffic take on average **3.38 times longer** than under very low traffic, holding all other variables constant.
+For `traffic_level_factor` "very low" represents the reference level. All other levels show highly significant positive coefficients, indicating longer delivery times with increasing traffic. As an example, the coefficient of traffic level "very high" is 1.219. The exponent of 1.219 is 3.38, which means that deliveries under very high traffic take on average **3.38 times longer** than under very low traffic, holding all other variables constant.
 
-For `order_type_factor` the reference level is `"Buffet"`. All other order types are significant, though their effects are smaller compared to traffic level. As an example, the coefficient of "Drinks" is 0.214. The exponent of 0.214 is 1.239, which means that deliveries with drinks take **23.9% longer** on average. This could be due to the delicate handling required for beverages (speculative).
+For `order_type_factor` the reference level is "Buffet". All other order types are significant, though their effects are smaller compared to traffic level. As an example, the coefficient of "Drinks" is 0.214. The exponent of 0.214 is 1.239, which means that deliveries with drinks take **23.9% longer** on average. This could be due to the delicate handling required for beverages (speculative).
 
 <br>
 
 #### Model performance of `lm.delivery1`
 
-The R-squared value of the model was 0.9202. This indicates that **92.02% of the variance** in the log-transformed delivery time is explained by the model.
+The R-squared value of the model is 0.9202. This indicates that **92.02% of the variance** in the log-transformed delivery time is explained by the model.
 
 The adjusted R² (value = 0.9201) accounts for the number of predictors and penalizes model complexity. The fact that it is almost identical to the regular R² suggests that all included predictors contribute meaningfully to the model.
 
-The Residual Standard Error (RSE) was 0.1332 (on the log scale). This measures the average deviation of the observed log-delivery times from the fitted values. To interpret it on the original scale we exponentiate 0.1332 and receive a value of 1.142. This can be interpreted that on average the predicted delivery time differs from observed values by approximately **14.2%**.
+The Residual Standard Error (RSE) is 0.1332 (on the log scale). This measures the average deviation of the observed log-delivery times from the fitted values. To interpret it on the original scale we exponentiate 0.1332 and receive a value of 1.142. This can be interpreted that on average the predicted delivery time differs from observed values by approximately **14.2%**.
 
 These three metrics suggests that the model fits the data well and explains most of the variation in the response variable.
 
@@ -635,7 +631,7 @@ These three metrics suggests that the model fits the data well and explains most
 
 #### Diagnostic plots for `lm.delivery1`
 
-As Diagnostic plots for `lm.delivery1`, we created a Residuals vs Fitted Values plot and a Q-Q Plot.
+As diagnostic plots for `lm.delivery1`, we created a Residuals vs Fitted Values plot and a Q-Q Plot.
 
 ```{r, fig.width=12, fig.height = 6}
 # diagnostic plots
@@ -693,7 +689,7 @@ lm.delivery2
 ```
 
 
-A comparison of the Coefficient estimates between `lm.delivery1` and `lm.delivery2` shows that the R-squared and Adjusted R-squared remain unchanged. The model quality is therefore practically the same.
+A comparison of the coefficient estimates between `lm.delivery1` and `lm.delivery2` shows that the R-squared and Adjusted R-squared remain unchanged. The model quality is therefore practically the same.
 
 <br>
 
@@ -721,7 +717,7 @@ Finally, the AIC values of both models are nearly identical, again supporting th
 
 ### 3.1.3 Third Linear Model – incl. interaction
 
-In the next step, we explore whether an interaction exists between `distance_km` and `traffic_level_factor`. We chose to do so, because the effect of distance on delivery time may be different / stronger under heavy traffic conditions. For example, slow progress over a long distance could lead to a much longer delivery times.
+In the next step, we explore whether an interaction exists between `distance_km` and `traffic_level_factor`. We choose to do so, because the effect of distance on delivery time may be different / stronger under heavy traffic conditions. For example, slow progress over a long distance could lead to much longer delivery times.
 
 We therefore fit a third model including the interaction term (see code chunk below).
 
@@ -805,7 +801,7 @@ Both AIC and ANOVA favor the model including the interaction. We therefore selec
 
 ### 3.1.4 Predictions
 
-After selecting `lm.interaction` as our final model, we now evaluate its performance on the test dataset.
+After selecting `lm.interaction` as our final model, we now evaluate its performance on the test data set.
 
 We start by generating predictions on the log-scale using the `predict()` function and then transform them back to the original scale (minutes) using `exp()`. After that we compare the predicted delivery times to the actual values using scatter plots and vertical error bars to visualize the prediction error.
 
@@ -1017,7 +1013,7 @@ Slight discrepancies appear under "Very High" traffic, where the model tends to 
 
 This comparison validates that the Poisson model reasonably replicates key patterns in the data and supports its use for simulating delivery behavior under varying traffic levels.
 
-```{r, poisson_CP_1, fig.align='center'}
+```{r, poisson_CP_1, fig.width=8, fig.height=4, fig.align='center'}
 # simulate some data from this model
 set.seed(2)
 sim.data.average_speed_kmph.Poisson <- simulate(poisson.model)
@@ -1074,7 +1070,7 @@ To check for overdispersion, we calculated the overdispersion statistic using Pe
 **Conclusion**
 The residual diagnostics show no major issues with model specification. The model appears to fit the data reasonably well, with no evidence of significant overdispersion or major misspecification.
 
-```{r, poisson_RA_1, fig.width=12, fig.height = 6}
+```{r, poisson_RA_1, fig.width=8, fig.height = 3}
 
 # residual analysis
 # 1.compute residuals
@@ -1272,7 +1268,7 @@ conf_df %>%
 
 # Display accuracy
 data.frame(Accuracy = round(accuracy, 4)) %>%
-  kbl(caption = "Model Accuracy", align = "c") %>%
+  kbl(caption = "Binomial Model Accuracy", align = "c") %>%
   kable_styling(position = "center", full_width = TRUE)
 ```
 
@@ -1727,7 +1723,7 @@ In this section, we aim to classify the **traffic level** using SVM models. The 
 
 ### 3.4.1 Data Preparation
 
-For the SVM model, we created a new dataset, `svm_data`, containing the selected features. Specifically, we chose `distance_km` and `average_speed_kmph` as predictors, and ensured that the target variable was converted to a factor. The data was then split into training and test sets using stratified sampling to preserve the class distribution.
+For the SVM model, we created a new data set, `svm_data`, containing the selected features. Specifically, we chose `distance_km` and `average_speed_kmph` as predictors, and ensured that the target variable was converted to a factor. The data was then split into training and test sets using stratified sampling to preserve the class distribution.
 
 We deliberately limited the model to these two predictors. First, they are both continuous and provide clear, interpretable relationships with delivery time. In contrast, exploratory plots indicated that the available categorical variables (e.g., order type) did not exhibit meaningful separation between delivery time classes. We aimed to build a simple and more robust model by limiting the features, as SVM Models are prone to overfitting.
 
@@ -1783,7 +1779,7 @@ To better understand how the SVM model separates traffic levels, we visualize th
 
 We generate a prediction grid and overlay it with the training points to illustrate the model's classification behavior.
 
-```{r, fig.align='center'}
+```{r, fig.align='center', fig.width=4, fig.height=4}
 # Create grid of points across the feature space
 xrange <- seq(min(svm_data$distance_km), max(svm_data$distance_km), length.out = 200)
 yrange <- seq(min(svm_data$average_speed_kmph), max(svm_data$average_speed_kmph), length.out = 200)
@@ -1844,7 +1840,7 @@ The confusion matrix for the radial SVM shows similar performance to the linear 
 
 We now plot the decision boundaries of the **radial SVM** using the same feature grid as before. Unlike the linear SVM, the radial kernel allows for nonlinear and curved boundaries. This helps us visually assess whether the model better separates overlapping classes.
 
-```{r, fig.align='center'}
+```{r, fig.align='center', fig.width=4, fig.height=4}
 # Create prediction grid (as before)
 xrange <- seq(min(svm_data$distance_km), max(svm_data$distance_km), length.out = 200)
 yrange <- seq(min(svm_data$average_speed_kmph), max(svm_data$average_speed_kmph), length.out = 200)
@@ -2016,7 +2012,7 @@ processed_data <- cbind(train_scaled_numeric, train_encoded_categorical, train_t
 
 A random seed is set for consistency and the `neuralnet` package is used to make the neural network model. There are eighteen nodes in the input layer, three nodes in the single hidden layer and one node in the output layer. This configuration is chosen to maximise on the data's potential while keeping the model fairly simple.
 
-```{r, neural_network_model, out.width="100%", fig.align="center"}
+```{r, neural_network_model, fig.width=10, fig.height=5, fig.align="center"}
 set.seed(42)
 delivery_time_model = neuralnet(log_delivery_time ~ temperature_celsius + humidity_percent +
                          distance_km + order_type_factor_Buffet + order_type_factor_Drinks +
